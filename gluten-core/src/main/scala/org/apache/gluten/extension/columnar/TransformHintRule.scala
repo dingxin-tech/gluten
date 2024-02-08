@@ -375,7 +375,7 @@ case class AddTransformHintRule() extends Rule[SparkPlan] {
               ScanTransformerFactory.createFileSourceScanTransformer(plan, validation = true)
             transformer.doValidate().tagOnFallback(plan)
           }
-        case plan if HiveTableScanExecTransformer.isHiveTableScan(plan) =>
+        case plan if HiveTableScanExecTransformer.isOdpsTableScan(plan) =>
           HiveTableScanExecTransformer.validate(plan).tagOnFallback(plan)
         case plan: ProjectExec =>
           val transformer = ProjectExecTransformer(plan.projectList, plan.child)
@@ -577,7 +577,7 @@ object AddTransformHintRule {
       plan match {
         case _: BatchScanExec => pass()
         case _: FileSourceScanExec => pass()
-        case p if HiveTableScanExecTransformer.isHiveTableScan(p) => pass()
+        case p if HiveTableScanExecTransformer.isOdpsTableScan(p) => pass()
         case filter: FilterExec =>
           val childIsScan = filter.child.isInstanceOf[FileSourceScanExec] ||
             filter.child.isInstanceOf[BatchScanExec]

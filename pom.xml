@@ -35,6 +35,9 @@
     <module>package</module>
     <module>shims</module>
     <module>gluten-ras</module>
+
+    <module>gluten-data</module>
+    <module>backends-velox</module>
   </modules>
 
   <properties>
@@ -145,6 +148,9 @@
       </properties>
     </profile>
     <profile>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
       <id>spark-3.3</id>
       <properties>
         <sparkbundle.version>3.3</sparkbundle.version>
@@ -278,7 +284,7 @@
     <profile>
       <id>backends-velox</id>
       <activation>
-        <activeByDefault>false</activeByDefault>
+        <activeByDefault>true</activeByDefault>
       </activation>
       <modules>
         <module>gluten-data</module>
@@ -298,6 +304,22 @@
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>com.aliyun.odps</groupId>
+        <artifactId>spark-odps-hive_2.12</artifactId>
+        <version>3.3.1-odps0.47.0</version>
+        <scope>provided</scope>
+        <exclusions>
+          <exclusion>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-hive_${scala.binary.version}</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.lz4</groupId>
+            <artifactId>lz4-java</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
       <dependency>
         <groupId>com.github.ben-manes.caffeine</groupId>
         <artifactId>caffeine</artifactId>

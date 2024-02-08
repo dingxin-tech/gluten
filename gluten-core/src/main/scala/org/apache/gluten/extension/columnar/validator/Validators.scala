@@ -131,7 +131,7 @@ object Validators {
     override def validate(plan: SparkPlan): Validator.OutCome = plan match {
       case _: BatchScanExec => pass()
       case _: FileSourceScanExec => pass()
-      case p if HiveTableScanExecTransformer.isHiveTableScan(p) => pass()
+      case p if HiveTableScanExecTransformer.isOdpsTableScan(p) => pass()
       case p if scanOnly => fail(p)
       case _ => pass()
     }
@@ -188,9 +188,6 @@ object Validators {
       case p
           if SparkShimLoader.getSparkShims.isWindowGroupLimitExec(
             plan) && !conf.enableColumnarWindowGroupLimit =>
-        fail(p)
-      case p
-          if HiveTableScanExecTransformer.isHiveTableScan(p) && !conf.enableColumnarHiveTableScan =>
         fail(p)
       case p: SampleExec
           if !(conf.enableColumnarSample && BackendsApiManager.getSettings.supportSampleExec()) =>

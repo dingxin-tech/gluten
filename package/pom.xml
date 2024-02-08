@@ -46,6 +46,21 @@
       <artifactId>spark-hive_${scala.binary.version}</artifactId>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>com.aliyun.odps</groupId>
+      <artifactId>spark-odps-hive_${scala.binary.version}</artifactId>
+      <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.spark</groupId>
+          <artifactId>spark-hive_${scala.binary.version}</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.lz4</groupId>
+          <artifactId>lz4-java</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
   </dependencies>
 
   <artifactId>gluten-package</artifactId>
@@ -260,6 +275,9 @@
                     <ignoreClass>org.apache.commons.logging.*</ignoreClass>
                     <!-- hive -->
                     <ignoreClass>org.apache.hadoop.hive.*</ignoreClass>
+                    <ignoreClass>org.apache.spark.sql.hive.*</ignoreClass>
+                    <!-- lz4 -->
+                    <ignoreClass>net.jpountz.*</ignoreClass>
                     <!-- celeborn -->
                     <ignoreClass>org.apache.spark.sql.execution.columnar.ByteBufferHelper</ignoreClass>
                     <ignoreClass>org.apache.spark.sql.execution.columnar.ByteBufferHelper$</ignoreClass>

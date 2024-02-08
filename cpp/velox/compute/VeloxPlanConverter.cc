@@ -51,78 +51,39 @@ VeloxPlanConverter::VeloxPlanConverter(
 }
 
 namespace {
-std::shared_ptr<SplitInfo> parseScanSplitInfo(
-    const google::protobuf::RepeatedPtrField<substrait::ReadRel_LocalFiles_FileOrFiles>& fileList) {
-  using SubstraitFileFormatCase = ::substrait::ReadRel_LocalFiles_FileOrFiles::FileFormatCase;
-
-  auto splitInfo = std::make_shared<SplitInfo>();
-  splitInfo->paths.reserve(fileList.size());
-  splitInfo->starts.reserve(fileList.size());
-  splitInfo->lengths.reserve(fileList.size());
-  splitInfo->partitionColumns.reserve(fileList.size());
-  splitInfo->metadataColumns.reserve(fileList.size());
-  for (const auto& file : fileList) {
-    // Expect all Partitions share the same index.
-    splitInfo->partitionIndex = file.partition_index();
-
-    std::unordered_map<std::string, std::string> partitionColumnMap;
-    for (const auto& partitionColumn : file.partition_columns()) {
-      partitionColumnMap[partitionColumn.key()] = partitionColumn.value();
-    }
-    splitInfo->partitionColumns.emplace_back(partitionColumnMap);
-
-    std::unordered_map<std::string, std::string> metadataColumnMap;
-    for (const auto& metadataColumn : file.metadata_columns()) {
-      metadataColumnMap[metadataColumn.key()] = metadataColumn.value();
-    }
-    splitInfo->metadataColumns.emplace_back(metadataColumnMap);
-
-    splitInfo->paths.emplace_back(file.uri_file());
-    splitInfo->starts.emplace_back(file.start());
-    splitInfo->lengths.emplace_back(file.length());
-    switch (file.file_format_case()) {
-      case SubstraitFileFormatCase::kOrc:
-        splitInfo->format = dwio::common::FileFormat::ORC;
-        break;
-      case SubstraitFileFormatCase::kDwrf:
-        splitInfo->format = dwio::common::FileFormat::DWRF;
-        break;
-      case SubstraitFileFormatCase::kParquet:
-        splitInfo->format = dwio::common::FileFormat::PARQUET;
-        break;
-      case SubstraitFileFormatCase::kText:
-        splitInfo->format = dwio::common::FileFormat::TEXT;
-        break;
-      case SubstraitFileFormatCase::kIceberg:
-        splitInfo = IcebergPlanConverter::parseIcebergSplitInfo(file, std::move(splitInfo));
-        break;
-      default:
-        splitInfo->format = dwio::common::FileFormat::UNKNOWN;
-        break;
-    }
-  }
-  return splitInfo;
-}
-
 void parseLocalFileNodes(
     SubstraitToVeloxPlanConverter* planConverter,
-    std::vector<::substrait::ReadRel_LocalFiles>& localFiles) {
+    std::vector<::substrait::ReadRel_ExtensionTable>& localFiles) {
   std::vector<std::shared_ptr<SplitInfo>> splitInfos;
   splitInfos.reserve(localFiles.size());
   for (int32_t i = 0; i < localFiles.size(); i++) {
-    const auto& localFile = localFiles[i];
-    const auto& fileList = localFile.items();
-
-    splitInfos.push_back(parseScanSplitInfo(fileList));
+    const auto& extensionTable = localFiles[i];
+    if (extensionTable.detail().Is<::substrait::ReadRel_OdpsScanSplit>()) {
+      ::substrait::ReadRel_OdpsScanSplit odpsScanSplit;
+      if (extensionTable.detail().UnpackTo(&odpsScanSplit)) {
+        auto splitInfo = std::make_shared<SplitInfo>();
+        splitInfo->projectName = odpsScanSplit.project();
+        splitInfo->schemaName = odpsScanSplit.schema();
+        splitInfo->tableName = odpsScanSplit.table();
+        splitInfo->sessionId = odpsScanSplit.sessionid();
+        splitInfo->index = odpsScanSplit.index();
+        splitInfo->row_index = odpsScanSplit.startindex();
+        splitInfo->row_count = odpsScanSplit.numrecord();
+        splitInfos.push_back(std::move(splitInfo));
+      } else {
+        std::cerr << "Error unpacking ExtensionTable detail as OdpsScanSplit." << std::endl;
+      }
+    } else {
+      std::cerr << "ExtensionTable detail is not of type OdpsScanSplit." << std::endl;
+    }
   }
-
   planConverter->setSplitInfos(std::move(splitInfos));
 }
 } // namespace
 
 std::shared_ptr<const facebook::velox::core::PlanNode> VeloxPlanConverter::toVeloxPlan(
     const ::substrait::Plan& substraitPlan,
-    std::vector<::substrait::ReadRel_LocalFiles> localFiles) {
+    std::vector<::substrait::ReadRel_ExtensionTable> localFiles) {
   if (!validationMode_) {
     parseLocalFileNodes(&substraitVeloxPlanConverter_, localFiles);
   }

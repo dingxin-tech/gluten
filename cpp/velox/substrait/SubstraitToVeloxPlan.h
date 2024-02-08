@@ -19,7 +19,8 @@
 
 #include "SubstraitToVeloxExpr.h"
 #include "TypeUtils.h"
-#include "velox/connectors/hive/TableHandle.h"
+#include "velox/connectors/odps/OdpsConnector.h"
+#include "velox/connectors/odps/TableHandle.hpp"
 #include "velox/core/PlanNode.h"
 #include "velox/dwio/common/Options.h"
 
@@ -30,26 +31,15 @@ struct SplitInfo {
   /// Whether the split comes from arrow array stream node.
   bool isStream = false;
 
-  /// The Partition index.
-  u_int32_t partitionIndex;
+  std::string projectName;
+  std::string schemaName;
+  std::string tableName;
 
-  /// The partition columns associated with partitioned table.
-  std::vector<std::unordered_map<std::string, std::string>> partitionColumns;
+  std::string sessionId;
 
-  /// The metadata columns associated with partitioned table.
-  std::vector<std::unordered_map<std::string, std::string>> metadataColumns;
-
-  /// The file paths to be scanned.
-  std::vector<std::string> paths;
-
-  /// The file starts in the scan.
-  std::vector<u_int64_t> starts;
-
-  /// The lengths to be scanned.
-  std::vector<u_int64_t> lengths;
-
-  /// The file format of the files to be scanned.
-  dwio::common::FileFormat format;
+  int index;
+  long row_index;
+  long row_count;
 
   /// Make SplitInfo polymorphic
   virtual ~SplitInfo() = default;
@@ -525,7 +515,7 @@ class SubstraitToVeloxPlanConverter {
       const std::vector<::substrait::Expression_SingularOrList>& singularOrLists);
 
   /// Connect all remaining functions with 'and' relation
-  /// for the use of remaingFilter in Hive Connector.
+  /// for the use of remaingFilter in Odps Connector.
   core::TypedExprPtr connectWithAnd(
       std::vector<std::string> inputNameList,
       std::vector<TypePtr> inputTypeList,

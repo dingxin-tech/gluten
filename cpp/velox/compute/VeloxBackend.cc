@@ -38,8 +38,12 @@
 #include "utils/exception.h"
 #include "velox/common/caching/SsdCache.h"
 #include "velox/common/file/FileSystems.h"
-#include "velox/connectors/hive/HiveConnector.h"
-#include "velox/connectors/hive/HiveDataSource.h"
+#include "velox/common/memory/MmapAllocator.h"
+#include "velox/connectors/odps/OdpsConfig.hpp"
+#include "velox/connectors/odps/OdpsConnector.h"
+#include "velox/connectors/odps/OdpsDatasource.h"
+#include "velox/dwio/dwrf/reader/DwrfReader.h"
+#include "velox/dwio/parquet/RegisterParquetReader.h"
 #include "velox/serializers/PrestoSerializer.h"
 
 DECLARE_bool(velox_exception_user_stacktrace_enabled);
@@ -195,44 +199,16 @@ void VeloxBackend::initConnector() {
     connectorConfMap[k] = v;
   }
 
-#ifdef ENABLE_ABFS
-  const auto& confValue = backendConf_->values();
-  for (auto& [k, v] : confValue) {
-    if (k.find("fs.azure.account.key") == 0) {
-      connectorConfMap[k] = v;
-    } else if (k.find("spark.hadoop.fs.azure.account.key") == 0) {
-      constexpr int32_t accountKeyPrefixLength = 13;
-      connectorConfMap[k.substr(accountKeyPrefixLength)] = v;
-    }
-  }
-#endif
-  connectorConfMap[velox::connector::hive::HiveConfig::kEnableFileHandleCache] =
-      backendConf_->get<bool>(kVeloxFileHandleCacheEnabled, kVeloxFileHandleCacheEnabledDefault) ? "true" : "false";
-
-  connectorConfMap[velox::connector::hive::HiveConfig::kMaxCoalescedBytes] =
-      backendConf_->get<std::string>(kMaxCoalescedBytes, "67108864"); // 64M
-  connectorConfMap[velox::connector::hive::HiveConfig::kMaxCoalescedDistanceBytes] =
-      backendConf_->get<std::string>(kMaxCoalescedDistanceBytes, "1048576"); // 1M
-  connectorConfMap[velox::connector::hive::HiveConfig::kPrefetchRowGroups] =
-      backendConf_->get<std::string>(kPrefetchRowGroups, "1");
-  connectorConfMap[velox::connector::hive::HiveConfig::kLoadQuantum] =
-      backendConf_->get<std::string>(kLoadQuantum, "268435456"); // 256M
-  connectorConfMap[velox::connector::hive::HiveConfig::kFooterEstimatedSize] =
-      backendConf_->get<std::string>(kDirectorySizeGuess, "32768"); // 32K
-  connectorConfMap[velox::connector::hive::HiveConfig::kFilePreloadThreshold] =
-      backendConf_->get<std::string>(kFilePreloadThreshold, "1048576"); // 1M
-
-  // set cache_prefetch_min_pct default as 0 to force all loads are prefetched in DirectBufferInput.
-  FLAGS_cache_prefetch_min_pct = backendConf_->get<int>(kCachePrefetchMinPct, 0);
-
   auto ioThreads = backendConf_->get<int32_t>(kVeloxIOThreads, kVeloxIOThreadsDefault);
   if (ioThreads > 0) {
     ioExecutor_ = std::make_unique<folly::IOThreadPoolExecutor>(ioThreads);
   }
-  velox::connector::registerConnector(std::make_shared<velox::connector::hive::HiveConnector>(
-      kHiveConnectorId,
+  velox::connector::registerConnector(
+      std::make_shared<velox::connector::odps::OdpsConnector>(
+      kOdpsConnectorId,
       std::make_shared<facebook::velox::core::MemConfig>(std::move(connectorConfMap)),
-      ioExecutor_.get()));
+      ioExecutor_.get()
+      ));
 }
 
 void VeloxBackend::initUdf() {

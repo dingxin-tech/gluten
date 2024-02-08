@@ -657,16 +657,20 @@ object GlutenConfig {
 
     val nativeConfMap = new util.HashMap[String, String]()
 
+    // extract maxcompute conf from SparkConf send to velox
+    nativeConfMap.put("access_id", conf("spark.hadoop.odps.access.id"))
+    nativeConfMap.put("access_key", conf("spark.hadoop.odps.access.key"))
+    nativeConfMap.put("endpoint", conf("spark.hadoop.odps.end.point"))
+    nativeConfMap.put("default_project", conf("spark.hadoop.odps.project.name"))
+    if (conf.contains("spark.hadoop.odps.tunnel.end.point")) {
+      nativeConfMap.put("tunnel_endpoint", conf("spark.hadoop.odps.tunnel.end.point"))
+    }
+    if (conf.contains("spark.hadoop.odps.tunnel.quota.name")) {
+      nativeConfMap.put("quota_name", conf("spark.hadoop.odps.tunnel.quota.name"))
+    }
+
     // some configs having default values
     val keyWithDefault = ImmutableList.of(
-      (SPARK_S3_ACCESS_KEY, ""),
-      (SPARK_S3_SECRET_KEY, ""),
-      (SPARK_S3_ENDPOINT, "localhost:9000"),
-      (SPARK_S3_CONNECTION_SSL_ENABLED, "false"),
-      (SPARK_S3_PATH_STYLE_ACCESS, "true"),
-      (SPARK_S3_USE_INSTANCE_CREDENTIALS, "false"),
-      (SPARK_S3_IAM, ""),
-      (SPARK_S3_IAM_SESSION_NAME, ""),
       (
         COLUMNAR_VELOX_CONNECTOR_IO_THREADS.key,
         COLUMNAR_VELOX_CONNECTOR_IO_THREADS.defaultValueString),
@@ -699,16 +703,6 @@ object GlutenConfig {
     conf
       .filter(_._1.startsWith(backendPrefix))
       .foreach(entry => nativeConfMap.put(entry._1, entry._2))
-
-    // put in all S3 configs
-    conf
-      .filter(_._1.startsWith(HADOOP_PREFIX + S3A_PREFIX))
-      .foreach(entry => nativeConfMap.put(entry._1, entry._2))
-
-    conf
-      .filter(_._1.startsWith(SPARK_ABFS_ACCOUNT_KEY))
-      .foreach(entry => nativeConfMap.put(entry._1, entry._2))
-
     // return
     nativeConfMap
   }
@@ -1311,7 +1305,7 @@ object GlutenConfig {
       .internal()
       .doc("The split preload per task")
       .intConf
-      .createWithDefault(2)
+      .createWithDefault(0)
 
   val COLUMNAR_VELOX_GLOG_VERBOSE_LEVEL =
     buildConf("spark.gluten.sql.columnar.backend.velox.glogVerboseLevel")
@@ -1484,7 +1478,7 @@ object GlutenConfig {
     buildConf("spark.gluten.sql.validation.printStackOnFailure")
       .internal()
       .booleanConf
-      .createWithDefault(false)
+      .createWithDefault(true)
 
   val SOFT_AFFINITY_LOG_LEVEL =
     buildConf("spark.gluten.soft-affinity.logLevel")
@@ -1494,7 +1488,7 @@ object GlutenConfig {
       .checkValue(
         logLevel => Set("TRACE", "DEBUG", "INFO", "WARN", "ERROR").contains(logLevel),
         "Valid values are 'trace', 'debug', 'info', 'warn' and 'error'.")
-      .createWithDefault("DEBUG")
+      .createWithDefault("INFO")
 
   val DEBUG_ENABLED =
     buildConf(GLUTEN_DEBUG_MODE)

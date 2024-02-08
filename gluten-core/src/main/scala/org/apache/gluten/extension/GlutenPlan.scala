@@ -67,6 +67,9 @@ trait GlutenPlan extends SparkPlan with Convention.KnownBatchType with LogLevelU
       TransformerState.enterValidation
       val res = doValidateInternal()
       if (!res.isValid) {
+        logInfo(
+          s"Validation failed for plan: ${this.getClass.toString}, " +
+            s"due to: ${res.reason.getOrElse("")}")
         TestStats.addFallBackClassName(this.getClass.toString)
       }
       res

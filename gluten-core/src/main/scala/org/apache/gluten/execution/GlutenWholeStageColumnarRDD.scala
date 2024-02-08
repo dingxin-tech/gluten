@@ -33,6 +33,7 @@ trait BaseGlutenPartition extends Partition with InputPartition {
   def plan: Array[Byte]
 }
 
+// plan = protobuf format of Substrait plan
 case class GlutenPartition(
     index: Int,
     plan: Array[Byte],

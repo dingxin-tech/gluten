@@ -87,8 +87,10 @@ class VeloxMetricsApi extends MetricsApi with Logging {
       metrics: Map[String, SQLMetric]): MetricsUpdater = new BatchScanMetricsUpdater(metrics)
 
   override def genHiveTableScanTransformerMetrics(
-      sparkContext: SparkContext): Map[String, SQLMetric] =
+      sparkContext: SparkContext): Map[String, SQLMetric] = {
+    // TODO: maybe ODPS don't need such metrics
     Map(
+      "splitDataTime" -> SQLMetrics.createTimingMetric(sparkContext, "split data time (ms)"),
       "rawInputRows" -> SQLMetrics.createMetric(sparkContext, "number of raw input rows"),
       "rawInputBytes" -> SQLMetrics.createSizeMetric(sparkContext, "number of raw input bytes"),
       "outputVectors" -> SQLMetrics.createMetric(sparkContext, "number of output vectors"),
@@ -122,6 +124,7 @@ class VeloxMetricsApi extends MetricsApi with Logging {
         "remaining filter time"),
       "ioWaitTime" -> SQLMetrics.createNanoTimingMetric(sparkContext, "io wait time")
     )
+  }
 
   override def genHiveTableScanTransformerMetricsUpdater(
       metrics: Map[String, SQLMetric]): MetricsUpdater = new HiveTableScanMetricsUpdater(metrics)

@@ -73,6 +73,7 @@ const bool kMemoryUseHugePagesDefault = false;
 const std::string kVeloxMemInitCapacity = "spark.gluten.sql.columnar.backend.velox.memInitCapacity";
 const uint64_t kVeloxMemInitCapacityDefault = 8 << 20;
 
+const std::string kOdpsConnectorId = "test-odps";
 const std::string kHiveConnectorId = "test-hive";
 const std::string kVeloxCacheEnabled = "spark.gluten.sql.columnar.backend.velox.cacheEnabled";
 

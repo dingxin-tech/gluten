@@ -57,7 +57,7 @@ case class EnumeratedTransform(session: SparkSession, outputsColumnar: Boolean)
     RasOffload.from[DataSourceScanExec](OffloadOthers()).toRule,
     RasOffload
       .from(
-        (node: SparkPlan) => HiveTableScanExecTransformer.isHiveTableScan(node),
+        (node: SparkPlan) => HiveTableScanExecTransformer.isOdpsTableScan(node),
         OffloadOthers())
       .toRule,
     RasOffload.from[CoalesceExec](OffloadOthers()).toRule,

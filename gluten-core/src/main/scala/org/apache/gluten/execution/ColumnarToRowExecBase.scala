@@ -51,6 +51,7 @@ abstract class ColumnarToRowExecBase(child: SparkPlan)
   def doExecuteInternal(): RDD[InternalRow]
 
   override def doExecute(): RDD[InternalRow] = {
+    logInfo(s"Executing GlutenPlan(ColumnarToRowExec) on $nodeName, which input is " + child.toJSON)
     doExecuteInternal()
   }
 

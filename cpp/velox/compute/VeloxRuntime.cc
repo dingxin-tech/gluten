@@ -79,15 +79,14 @@ void VeloxRuntime::parsePlan(const uint8_t* data, int32_t size, std::optional<st
 void VeloxRuntime::parseSplitInfo(const uint8_t* data, int32_t size, std::optional<std::string> dumpFile) {
   if (debugModeEnabled_ || dumpFile.has_value()) {
     try {
-      auto splitJson = substraitFromPbToJson("ReadRel.LocalFiles", data, size, dumpFile);
-      LOG_IF(INFO, debugModeEnabled_) << std::string(50, '#')
-                                      << " received substrait::ReadRel.LocalFiles: " << taskInfo_ << std::endl
-                                      << splitJson;
+      auto jsonPlan = substraitFromPbToJson("ReadRel.ExtensionTable", data, size, dumpFile);
+      LOG(INFO) << std::string(50, '#') << " received substrait::ReadRel.LocalFiles:";
+      LOG(INFO) << std::endl << jsonPlan;
     } catch (const std::exception& e) {
       LOG(WARNING) << "Error converting Substrait plan to JSON: " << e.what();
     }
   }
-  ::substrait::ReadRel_LocalFiles localFile;
+  ::substrait::ReadRel_ExtensionTable localFile;
   GLUTEN_CHECK(parseProtobuf(data, size, &localFile) == true, "Parse substrait plan failed");
   localFiles_.push_back(localFile);
 }

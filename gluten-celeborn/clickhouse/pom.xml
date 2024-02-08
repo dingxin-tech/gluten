@@ -67,15 +67,15 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.spark</groupId>
-      <artifactId>spark-hive_${scala.binary.version}</artifactId>
+      <groupId>com.aliyun.odps</groupId>
+      <artifactId>spark-odps-hive_${scala.binary.version}</artifactId>
       <version>${spark.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.spark</groupId>
-      <artifactId>spark-hive_${scala.binary.version}</artifactId>
+      <groupId>com.aliyun.odps</groupId>
+      <artifactId>spark-odps-hive_${scala.binary.version}</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

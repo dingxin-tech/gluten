@@ -53,8 +53,8 @@
       <scope>runtime</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.spark</groupId>
-      <artifactId>spark-hive_${scala.binary.version}</artifactId>
+      <groupId>com.aliyun.odps</groupId>
+      <artifactId>spark-odps-hive_${scala.binary.version}</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>

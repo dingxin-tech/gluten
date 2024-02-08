@@ -24,12 +24,15 @@ import org.apache.gluten.substrait.type.TypeNode;
 import io.substrait.proto.Plan;
 import io.substrait.proto.PlanRel;
 import io.substrait.proto.RelRoot;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
 public class PlanNode implements Serializable {
+  private static final Logger LOG = LoggerFactory.getLogger(PlanNode.class);
   private final List<FunctionMappingNode> mappingNodes = new ArrayList<>();
   private final List<RelNode> relNodes = new ArrayList<>();
   private final List<String> outNames = new ArrayList<>();
@@ -86,6 +89,7 @@ public class PlanNode implements Serializable {
     if (extension != null) {
       planBuilder.setAdvancedExtensions(extension.toProtobuf());
     }
+    LOG.debug("plan: {}", planBuilder.build());
     return planBuilder.build();
   }
 }

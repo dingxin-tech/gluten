@@ -25,6 +25,7 @@
 #include "utils/ConfigExtractor.h"
 
 #include "config/GlutenConfig.h"
+#include "substrait/algebra.pb.h"
 
 namespace gluten {
 namespace {
@@ -642,6 +643,7 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
   }
 
   // Do not hard-code connector ID and allow for connectors other than Hive.
+  static const std::string kOdpsConnectorId = "test-odps";
   static const std::string kHiveConnectorId = "test-hive";
 
   return std::make_shared<core::TableWriteNode>(
@@ -1130,65 +1132,29 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
     SubstraitParser::parseColumnTypes(baseSchema, columnTypes);
   }
 
-  // Do not hard-code connector ID and allow for connectors other than Hive.
-  static const std::string kHiveConnectorId = "test-hive";
+  // Do not hard-code connector ID and allow for connectors other than Odps.
+  static const std::string kOdpsConnectorId = "test-odps";
 
-  // Velox requires Filter Pushdown must being enabled.
-  bool filterPushdownEnabled = true;
-  std::shared_ptr<connector::hive::HiveTableHandle> tableHandle;
-  if (!readRel.has_filter()) {
-    tableHandle = std::make_shared<connector::hive::HiveTableHandle>(
-        kHiveConnectorId, "hive_table", filterPushdownEnabled, connector::hive::SubfieldFilters{}, nullptr);
-  } else {
-    // Flatten the conditions connected with 'and'.
-    std::vector<::substrait::Expression_ScalarFunction> scalarFunctions;
-    std::vector<::substrait::Expression_SingularOrList> singularOrLists;
-    std::vector<::substrait::Expression_IfThen> ifThens;
-    flattenConditions(readRel.filter(), scalarFunctions, singularOrLists, ifThens);
+  std::shared_ptr<connector::odps::OdpsTableHandle> tableHandle;
 
-    // The vector's subscript stands for the column index.
-    std::vector<RangeRecorder> rangeRecorders(veloxTypeList.size());
-
-    // Separate the filters to be two parts. The subfield part can be
-    // pushed down.
-    std::vector<::substrait::Expression_ScalarFunction> subfieldFunctions;
-    std::vector<::substrait::Expression_ScalarFunction> remainingFunctions;
-    std::vector<::substrait::Expression_SingularOrList> subfieldOrLists;
-    std::vector<::substrait::Expression_SingularOrList> remainingOrLists;
-
-    separateFilters(
-        rangeRecorders,
-        scalarFunctions,
-        subfieldFunctions,
-        remainingFunctions,
-        singularOrLists,
-        subfieldOrLists,
-        remainingOrLists,
-        veloxTypeList,
-        splitInfo->format);
-
-    // Create subfield filters based on the constructed filter info map.
-    auto subfieldFilters = createSubfieldFilters(colNameList, veloxTypeList, subfieldFunctions, subfieldOrLists);
-    // Connect the remaining filters with 'and'.
-    auto remainingFilter = connectWithAnd(colNameList, veloxTypeList, remainingFunctions, remainingOrLists, ifThens);
-
-    tableHandle = std::make_shared<connector::hive::HiveTableHandle>(
-        kHiveConnectorId, "hive_table", filterPushdownEnabled, std::move(subfieldFilters), remainingFilter);
-  }
+  tableHandle = std::make_shared<connector::odps::OdpsTableHandle>(kOdpsConnectorId);
 
   // Get assignments and out names.
   std::vector<std::string> outNames;
   outNames.reserve(colNameList.size());
+
+  // odps assignments is no use
   std::unordered_map<std::string, std::shared_ptr<connector::ColumnHandle>> assignments;
+
   for (int idx = 0; idx < colNameList.size(); idx++) {
     auto outName = SubstraitParser::makeNodeName(planNodeId_, idx);
-    auto columnType = columnTypes[idx];
-    assignments[outName] = std::make_shared<connector::hive::HiveColumnHandle>(
-        colNameList[idx], columnType, veloxTypeList[idx], veloxTypeList[idx]);
     outNames.emplace_back(outName);
-  }
-  auto outputType = ROW(std::move(outNames), std::move(veloxTypeList));
 
+    auto convertName = std::make_shared<connector::odps::OdpsColumnHandle>(outName);
+    assignments.emplace(colNameList.at(idx), convertName);
+  }
+
+  auto outputType = ROW(std::move(outNames), std::move(veloxTypeList));
   if (readRel.has_virtual_table()) {
     return toVeloxPlan(readRel, outputType);
   } else {
