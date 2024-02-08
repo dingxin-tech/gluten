@@ -77,6 +77,10 @@ endfunction()
 macro(ADD_VELOX_OBJECTS)
   add_library(velox_objects OBJECT IMPORTED GLOBAL)
   set_property(TARGET velox_objects PROPERTY IMPORTED_OBJECTS
+          "${VELOX_COMPONENTS_PATH}/connectors/odps/CMakeFiles/velox_odps_connector.dir/OdpsConnector.cpp.o"
+          "${VELOX_COMPONENTS_PATH}/connectors/odps/CMakeFiles/velox_odps_connector.dir/OdpsDatasource.cpp.o"
+
+#         TODO: remove hive dependencies when odps is full implement
           "${VELOX_COMPONENTS_PATH}/connectors/hive/CMakeFiles/velox_hive_connector.dir/FileHandle.cpp.o"
           "${VELOX_COMPONENTS_PATH}/connectors/hive/CMakeFiles/velox_hive_connector.dir/HiveConfig.cpp.o"
           "${VELOX_COMPONENTS_PATH}/connectors/hive/CMakeFiles/velox_hive_connector.dir/HiveConnector.cpp.o"

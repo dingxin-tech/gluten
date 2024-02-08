@@ -40,8 +40,12 @@
 #include "utils/exception.h"
 #include "velox/common/caching/SsdCache.h"
 #include "velox/common/file/FileSystems.h"
-#include "velox/connectors/hive/HiveConnector.h"
-#include "velox/connectors/hive/HiveDataSource.h"
+#include "velox/common/memory/MmapAllocator.h"
+#include "velox/connectors/odps/OdpsConfig.hpp"
+#include "velox/connectors/odps/OdpsConnector.h"
+#include "velox/connectors/odps/OdpsDatasource.h"
+#include "velox/dwio/dwrf/reader/DwrfReader.h"
+#include "velox/dwio/parquet/RegisterParquetReader.h"
 #include "velox/serializers/PrestoSerializer.h"
 
 DECLARE_bool(velox_exception_user_stacktrace_enabled);
@@ -67,7 +71,7 @@ const bool kEnableSystemExceptionStacktraceDefault = true;
 const std::string kMemoryUseHugePages = "spark.gluten.sql.columnar.backend.velox.memoryUseHugePages";
 const bool kMemoryUseHugePagesDefault = false;
 
-const std::string kHiveConnectorId = "test-hive";
+const std::string kOdpsConnectorId = "test-odps";
 const std::string kVeloxCacheEnabled = "spark.gluten.sql.columnar.backend.velox.cacheEnabled";
 
 // memory cache
@@ -262,54 +266,11 @@ void VeloxBackend::initConnector(const std::shared_ptr<const facebook::velox::Co
 
   auto mutableConf = std::make_shared<facebook::velox::core::MemConfigMutable>(conf->valuesCopy());
 
-  auto hiveConf = getHiveConfig(conf);
-  for (auto& [k, v] : hiveConf->valuesCopy()) {
-    mutableConf->setValue(k, v);
-  }
-
-#ifdef ENABLE_ABFS
-  const auto& confValue = conf->valuesCopy();
-  for (auto& [k, v] : confValue) {
-    if (k.find("fs.azure.account.key") == 0) {
-      mutableConf->setValue(k, v);
-    } else if (k.find("spark.hadoop.fs.azure.account.key") == 0) {
-      constexpr int32_t accountKeyPrefixLength = 13;
-      mutableConf->setValue(k.substr(accountKeyPrefixLength), v);
-    }
-  }
-#endif
-
-  mutableConf->setValue(
-      velox::connector::hive::HiveConfig::kEnableFileHandleCache,
-      conf->get<bool>(kVeloxFileHandleCacheEnabled, kVeloxFileHandleCacheEnabledDefault) ? "true" : "false");
-
-  mutableConf->setValue(
-      velox::connector::hive::HiveConfig::kMaxCoalescedBytes,
-      conf->get<std::string>(kMaxCoalescedBytes, "67108864")); // 64M
-  mutableConf->setValue(
-      velox::connector::hive::HiveConfig::kMaxCoalescedDistanceBytes,
-      conf->get<std::string>(kMaxCoalescedDistanceBytes, "1048576")); // 1M
-  mutableConf->setValue(
-      velox::connector::hive::HiveConfig::kPrefetchRowGroups, conf->get<std::string>(kPrefetchRowGroups, "1"));
-  mutableConf->setValue(
-      velox::connector::hive::HiveConfig::kLoadQuantum, conf->get<std::string>(kLoadQuantum, "268435456")); // 256M
-  mutableConf->setValue(
-      velox::connector::hive::HiveConfig::kFooterEstimatedSize,
-      conf->get<std::string>(kDirectorySizeGuess, "32768")); // 32K
-  mutableConf->setValue(
-      velox::connector::hive::HiveConfig::kFilePreloadThreshold,
-      conf->get<std::string>(kFilePreloadThreshold, "1048576")); // 1M
-
-  // set cache_prefetch_min_pct default as 0 to force all loads are prefetched in DirectBufferInput.
-  FLAGS_cache_prefetch_min_pct = conf->get<int>(kCachePrefetchMinPct, 0);
-
   if (ioThreads > 0) {
     ioExecutor_ = std::make_unique<folly::IOThreadPoolExecutor>(ioThreads);
   }
-  velox::connector::registerConnector(std::make_shared<velox::connector::hive::HiveConnector>(
-      kHiveConnectorId,
-      std::make_shared<facebook::velox::core::MemConfig>(mutableConf->valuesCopy()),
-      ioExecutor_.get()));
+  velox::connector::registerConnector(
+      std::make_shared<velox::connector::odps::OdpsConnector>(kOdpsConnectorId, mutableConf, ioExecutor_.get()));
 }
 
 void VeloxBackend::initUdf(const std::shared_ptr<const facebook::velox::Config>& conf) {

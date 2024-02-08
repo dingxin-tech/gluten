@@ -67,14 +67,14 @@ void VeloxRuntime::parsePlan(
 void VeloxRuntime::parseSplitInfo(const uint8_t* data, int32_t size, std::optional<std::string> dumpFile) {
   if (debugModeEnabled_) {
     try {
-      auto jsonPlan = substraitFromPbToJson("ReadRel.LocalFiles", data, size, dumpFile);
+      auto jsonPlan = substraitFromPbToJson("ReadRel.ExtensionTable", data, size, dumpFile);
       LOG(INFO) << std::string(50, '#') << " received substrait::ReadRel.LocalFiles:";
       LOG(INFO) << std::endl << jsonPlan;
     } catch (const std::exception& e) {
       LOG(WARNING) << "Error converting Substrait plan to JSON: " << e.what();
     }
   }
-  ::substrait::ReadRel_LocalFiles localFile;
+  ::substrait::ReadRel_ExtensionTable localFile;
   GLUTEN_CHECK(parseProtobuf(data, size, &localFile) == true, "Parse substrait plan failed");
   localFiles_.push_back(localFile);
 }
@@ -132,7 +132,6 @@ std::shared_ptr<ResultIterator> VeloxRuntime::createResultIterator(
 
   // Separate the scan ids and stream ids, and get the scan infos.
   getInfoAndIds(veloxPlanConverter.splitInfos(), veloxPlan_->leafPlanNodeIds(), scanInfos, scanIds, streamIds);
-
   auto* vmm = toVeloxMemoryManager(memoryManager);
   auto wholestageIter = std::make_unique<WholeStageResultIterator>(
       vmm, veloxPlan_, scanIds, scanInfos, streamIds, spillDir, sessionConf, taskInfo_);

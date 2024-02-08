@@ -35,6 +35,7 @@ trait BaseGlutenPartition extends Partition with InputPartition {
   def plan: Array[Byte]
 }
 
+// plan = protobuf format of Substrait plan
 case class GlutenPartition(
     index: Int,
     plan: Array[Byte],
@@ -84,6 +85,7 @@ class GlutenWholeStageColumnarRDD(
   private val numaBindingInfo = GlutenConfig.getConf.numaBindingInfo
 
   override def compute(split: Partition, context: TaskContext): Iterator[ColumnarBatch] = {
+    logInfo(s"GlutenWholeStageColumnarRDD compute $split")
     GlutenTimeMetric.millis(pipelineTime) {
       _ =>
         ExecutorManager.tryTaskSet(numaBindingInfo)

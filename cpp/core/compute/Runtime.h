@@ -145,7 +145,7 @@ class Runtime : public std::enable_shared_from_this<Runtime> {
  protected:
   std::unique_ptr<ObjectStore> objStore_ = ObjectStore::create();
   ::substrait::Plan substraitPlan_;
-  std::vector<::substrait::ReadRel_LocalFiles> localFiles_;
+  std::vector<::substrait::ReadRel_ExtensionTable> localFiles_;
   std::optional<std::string> writeFilesTempPath_;
   SparkTaskInfo taskInfo_;
   // Session conf map

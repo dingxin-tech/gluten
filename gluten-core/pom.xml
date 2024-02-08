@@ -20,6 +20,13 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.aliyun.odps</groupId>
+      <artifactId>spark-odps-hive_2.12</artifactId>
+      <version>3.3.1-odps0.47.0</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
       <groupId>io.glutenproject</groupId>
       <artifactId>gluten-ui</artifactId>
       <version>${project.version}</version>
@@ -169,7 +176,7 @@
       <exclusions>
         <exclusion>
           <groupId>de.erichseifert.vectorgraphics2d</groupId>
-          <artifactId>VectorGraphics2D</artifactId>		      
+          <artifactId>VectorGraphics2D</artifactId>
 	</exclusion>
       </exclusions>
     </dependency>
@@ -328,10 +335,10 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
       </plugin>
-      <plugin>
-        <groupId>org.scalastyle</groupId>
-        <artifactId>scalastyle-maven-plugin</artifactId>
-      </plugin>
+<!--      <plugin>-->
+<!--        <groupId>org.scalastyle</groupId>-->
+<!--        <artifactId>scalastyle-maven-plugin</artifactId>-->
+<!--      </plugin>-->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>

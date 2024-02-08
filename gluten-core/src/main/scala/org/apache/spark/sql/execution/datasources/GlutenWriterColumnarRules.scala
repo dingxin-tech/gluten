@@ -28,11 +28,8 @@ import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, OrderPreserving
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
-import org.apache.spark.sql.execution.command.{CreateDataSourceTableAsSelectCommand, DataWritingCommand, DataWritingCommandExec}
-import org.apache.spark.sql.execution.datasources.orc.OrcFileFormat
-import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.execution.command.{DataWritingCommand, DataWritingCommandExec}
 import org.apache.spark.sql.execution.datasources.v2.{AppendDataExec, OverwriteByExpressionExec}
-import org.apache.spark.sql.hive.execution.{CreateHiveTableAsSelectCommand, InsertIntoHiveDirCommand, InsertIntoHiveTable}
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 private case class FakeRowLogicAdaptor(child: LogicalPlan) extends OrderPreservingUnaryNode {
@@ -87,60 +84,7 @@ object GlutenWriterColumnarRules {
   //  2. support detect partition value, partition path, bucket value, bucket path at native side,
   //     see `BaseDynamicPartitionDataWriter`
   def getNativeFormat(cmd: DataWritingCommand): Option[String] = {
-    val parquetHiveFormat = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
-    val orcHiveFormat = "org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat"
-
-    if (!BackendsApiManager.getSettings.enableNativeWriteFiles()) {
-      return None
-    }
-
-    cmd match {
-      case command: CreateDataSourceTableAsSelectCommand =>
-        if (BackendsApiManager.getSettings.skipNativeCtas(command)) {
-          return None
-        }
-        if ("parquet".equals(command.table.provider.get)) {
-          Some("parquet")
-        } else if ("orc".equals(command.table.provider.get)) {
-          Some("orc")
-        } else {
-          None
-        }
-      case command: InsertIntoHadoopFsRelationCommand
-          if command.fileFormat.isInstanceOf[ParquetFileFormat] ||
-            command.fileFormat.isInstanceOf[OrcFileFormat] =>
-        if (BackendsApiManager.getSettings.skipNativeInsertInto(command)) {
-          return None
-        }
-
-        if (command.fileFormat.isInstanceOf[ParquetFileFormat]) {
-          Some("parquet")
-        } else if (command.fileFormat.isInstanceOf[OrcFileFormat]) {
-          Some("orc")
-        } else {
-          None
-        }
-      case command: InsertIntoHiveDirCommand =>
-        if (command.storage.outputFormat.get.equals(parquetHiveFormat)) {
-          Some("parquet")
-        } else if (command.storage.outputFormat.get.equals(orcHiveFormat)) {
-          Some("orc")
-        } else {
-          None
-        }
-      case command: InsertIntoHiveTable =>
-        if (command.table.storage.outputFormat.get.equals(parquetHiveFormat)) {
-          Some("parquet")
-        } else if (command.table.storage.outputFormat.get.equals(orcHiveFormat)) {
-          Some("orc")
-        } else {
-          None
-        }
-      case _: CreateHiveTableAsSelectCommand =>
-        None
-      case _ =>
-        None
-    }
+    Some("odps")
   }
 
   case class NativeWritePostRule(session: SparkSession) extends Rule[SparkPlan] {

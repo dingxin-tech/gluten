@@ -18,14 +18,12 @@ package io.glutenproject.backendsapi.velox
 
 import io.glutenproject.{GlutenConfig, GlutenPlugin, VELOX_BRANCH, VELOX_REVISION, VELOX_REVISION_TIME}
 import io.glutenproject.backendsapi._
-import io.glutenproject.execution.WriteFilesExecTransformer
 import io.glutenproject.expression.WindowFunctionsBuilder
 import io.glutenproject.extension.ValidationResult
 import io.glutenproject.sql.shims.SparkShimLoader
 import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat
-import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat.{DwrfReadFormat, OrcReadFormat, ParquetReadFormat}
+import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat.{DwrfReadFormat, OdpsReadFormat, OrcReadFormat, ParquetReadFormat}
 
-import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Alias, CumeDist, DenseRank, Descending, Expression, Lag, Literal, NamedExpression, NthValue, NTile, PercentRank, Rand, RangeFrame, Rank, RowNumber, SortOrder, SpecialFrameBoundary, SpecifiedWindowFrame}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Count, Sum}
 import org.apache.spark.sql.catalyst.plans.JoinType
@@ -33,8 +31,7 @@ import org.apache.spark.sql.catalyst.util.CharVarcharUtils
 import org.apache.spark.sql.execution.{ProjectExec, SparkPlan}
 import org.apache.spark.sql.execution.aggregate.HashAggregateExec
 import org.apache.spark.sql.execution.command.CreateDataSourceTableAsSelectCommand
-import org.apache.spark.sql.execution.datasources.{FileFormat, InsertIntoHadoopFsRelationCommand}
-import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.execution.datasources.InsertIntoHadoopFsRelationCommand
 import org.apache.spark.sql.expression.UDFResolver
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
@@ -133,118 +130,13 @@ object BackendSettings extends BackendSettingsApi {
         }
       case DwrfReadFormat => ValidationResult.ok
       case OrcReadFormat =>
-        if (!GlutenConfig.getConf.veloxOrcScanEnabled) {
-          ValidationResult.notOk(s"Velox ORC scan is turned off.")
-        } else {
-          val typeValidator: PartialFunction[StructField, String] = {
-            case StructField(_, ByteType, _, _) => "ByteType not support"
-            case StructField(_, arrayType: ArrayType, _, _)
-                if arrayType.elementType.isInstanceOf[StructType] =>
-              "StructType as element in ArrayType"
-            case StructField(_, arrayType: ArrayType, _, _)
-                if arrayType.elementType.isInstanceOf[ArrayType] =>
-              "ArrayType as element in ArrayType"
-            case StructField(_, mapType: MapType, _, _)
-                if mapType.keyType.isInstanceOf[StructType] =>
-              "StructType as Key in MapType"
-            case StructField(_, mapType: MapType, _, _)
-                if mapType.valueType.isInstanceOf[ArrayType] =>
-              "ArrayType as Value in MapType"
-            case StructField(_, stringType: StringType, _, metadata)
-                if CharVarcharUtils
-                  .getRawTypeString(metadata)
-                  .getOrElse(stringType.catalogString) != stringType.catalogString =>
-              CharVarcharUtils.getRawTypeString(metadata) + " not support"
-            case StructField(_, TimestampType, _, _) => "TimestampType not support"
-          }
-          if (!GlutenConfig.getConf.forceComplexTypeScanFallbackEnabled) {
-            validateTypes(typeValidator)
-          } else {
-            validateTypes(orcTypeValidatorWithComplexTypeFallback)
-          }
-        }
-      case _ => ValidationResult.notOk(s"Unsupported file format for $format.")
-    }
-  }
-
-  override def supportWriteFilesExec(
-      format: FileFormat,
-      fields: Array[StructField],
-      bucketSpec: Option[BucketSpec],
-      options: Map[String, String]): ValidationResult = {
-
-    def validateCompressionCodec(): Option[String] = {
-      // Velox doesn't support brotli and lzo.
-      val unSupportedCompressions = Set("brotli, lzo")
-      val compressionCodec = WriteFilesExecTransformer.getCompressionCodec(options)
-      if (unSupportedCompressions.contains(compressionCodec)) {
-        Some("Brotli or lzo compression codec is unsupported in Velox backend.")
-      } else {
-        None
-      }
-    }
-
-    // Validate if all types are supported.
-    def validateDateTypes(): Option[String] = {
-      val unsupportedTypes = fields.flatMap {
-        field =>
-          field.dataType match {
-            case _: TimestampType => Some("TimestampType")
-            case _: StructType => Some("StructType")
-            case _: ArrayType => Some("ArrayType")
-            case _: MapType => Some("MapType")
-            case _ => None
-          }
-      }
-      if (unsupportedTypes.nonEmpty) {
-        Some(unsupportedTypes.mkString("Found unsupported type:", ",", ""))
-      } else {
-        None
-      }
-    }
-
-    def validateFieldMetadata(): Option[String] = {
-      fields.find(_.metadata != Metadata.empty).map {
-        filed =>
-          s"StructField contain the metadata information: $filed, metadata: ${filed.metadata}"
-      }
-    }
-
-    def validateFileFormat(): Option[String] = {
-      format match {
-        case _: ParquetFileFormat => None
-        case _: FileFormat => Some("Only parquet fileformat is supported in Velox backend.")
-      }
-    }
-
-    def validateWriteFilesOptions(): Option[String] = {
-      val maxRecordsPerFile = options
-        .get("maxRecordsPerFile")
-        .map(_.toLong)
-        .getOrElse(SQLConf.get.maxRecordsPerFile)
-      if (maxRecordsPerFile > 0) {
-        Some("Unsupported native write: maxRecordsPerFile not supported.")
-      } else {
-        None
-      }
-    }
-
-    def validateBucketSpec(): Option[String] = {
-      if (bucketSpec.nonEmpty) {
-        Some("Unsupported native write: bucket write is not supported.")
-      } else {
-        None
-      }
-    }
-
-    validateCompressionCodec()
-      .orElse(validateFileFormat())
-      .orElse(validateFieldMetadata())
-      .orElse(validateDateTypes())
-      .orElse(validateWriteFilesOptions())
-      .orElse(validateBucketSpec()) match {
-      case Some(reason) => ValidationResult.notOk(reason)
-      case _ => ValidationResult.ok
+        ValidationResult.notOk(s"Velox ORC scan is turned off.")
+      case OdpsReadFormat => ValidationResult.ok
+      case _ =>
+        // scalastyle:off println
+        println(s"unknown format ${format.getClass.toString}")
+        // scalastyle:on println
+        ValidationResult.ok
     }
   }
 

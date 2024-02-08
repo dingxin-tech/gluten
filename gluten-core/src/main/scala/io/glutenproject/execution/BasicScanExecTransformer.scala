@@ -23,7 +23,7 @@ import io.glutenproject.substrait.`type`.ColumnTypeNode
 import io.glutenproject.substrait.SubstraitContext
 import io.glutenproject.substrait.extensions.ExtensionBuilder
 import io.glutenproject.substrait.plan.PlanBuilder
-import io.glutenproject.substrait.rel.{RelBuilder, SplitInfo}
+import io.glutenproject.substrait.rel.{OdpsScanNode, RelBuilder, SplitInfo}
 import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat
 
 import org.apache.spark.rdd.RDD
@@ -61,11 +61,17 @@ trait BasicScanExecTransformer extends LeafTransformSupport with BaseDataSource 
 
   /** Returns the split infos that will be processed by the underlying native engine. */
   def getSplitInfos: Seq[SplitInfo] = {
-    getPartitions.map(
+    val splitInfos = getPartitions.map(
       BackendsApiManager.getIteratorApiInstance
         .genSplitInfo(_, getPartitionSchema, fileFormat))
+    if (splitInfos.isEmpty) {
+      Seq(OdpsScanNode.EMPTY)
+    } else {
+      splitInfos
+    }
   }
 
+  // Velox don't support this method
   def doExecuteColumnarInternal(): RDD[ColumnarBatch] = {
     val numOutputRows = longMetric("outputRows")
     val numOutputVectors = longMetric("outputVectors")

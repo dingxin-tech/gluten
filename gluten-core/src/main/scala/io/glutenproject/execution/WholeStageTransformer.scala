@@ -29,6 +29,7 @@ import io.glutenproject.substrait.rel.{RelNode, SplitInfo}
 import io.glutenproject.utils.SubstraitPlanPrinterUtil
 
 import org.apache.spark._
+import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.softaffinity.SoftAffinity
 import org.apache.spark.sql.catalyst.InternalRow
@@ -402,6 +403,10 @@ case class WholeStageTransformer(child: SparkPlan, materializeInput: Boolean = f
     //      ...
     //  p1n  |  p2n    => substraitContext.setSplitInfo([p1n, p2n])
     val allScanSplitInfos = basicScanExecTransformers.map(_.getSplitInfos)
+    allScanSplitInfos.zipWithIndex.foreach {
+      case (splitInfos, index) =>
+        logInfo(s"getSplitInfosFromScanTransformer $index: $splitInfos")
+    }
     val partitionLength = allScanSplitInfos.head.size
     if (allScanSplitInfos.exists(_.size != partitionLength)) {
       throw new GlutenException(
@@ -416,7 +421,9 @@ case class WholeStageTransformer(child: SparkPlan, materializeInput: Boolean = f
  * partition of [[BroadcastBuildSideRDD]] is meaningless. [[BroadcastBuildSideRDD]] should only be
  * used to hold the broadcast value and generate iterator for join.
  */
-class ColumnarInputRDDsWrapper(columnarInputRDDs: Seq[RDD[ColumnarBatch]]) extends Serializable {
+class ColumnarInputRDDsWrapper(columnarInputRDDs: Seq[RDD[ColumnarBatch]])
+  extends Serializable
+  with Logging {
   def getDependencies: Seq[Dependency[ColumnarBatch]] = {
     assert(
       columnarInputRDDs
@@ -443,6 +450,7 @@ class ColumnarInputRDDsWrapper(columnarInputRDDs: Seq[RDD[ColumnarBatch]]) exten
   }
 
   def getIterators(
+      // TODO: RDD is always empty? [dingxin]
       inputColumnarRDDPartitions: Seq[Partition],
       context: TaskContext): Seq[Iterator[ColumnarBatch]] = {
     var index = 0

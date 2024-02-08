@@ -46,6 +46,7 @@ public class LocalFilesNode implements SplitInfo {
     MergeTreeReadFormat(),
     TextReadFormat(),
     JsonReadFormat(),
+    OdpsReadFormat(),
     UnknownFormat()
   }
 

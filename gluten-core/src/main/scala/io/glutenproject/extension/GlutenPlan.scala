@@ -65,6 +65,8 @@ trait GlutenPlan extends SparkPlan with LogLevelUtil {
       TransformerState.enterValidation
       val res = doValidateInternal()
       if (!res.isValid) {
+        logInfo(
+          s"Validation failed for plan: ${this.getClass.toString}, due to: ${res.reason.getOrElse("")}")
         TestStats.addFallBackClassName(this.getClass.toString)
       }
       res

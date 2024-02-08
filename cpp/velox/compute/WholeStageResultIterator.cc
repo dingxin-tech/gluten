@@ -14,12 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <iostream>
 #include "WholeStageResultIterator.h"
 #include "VeloxBackend.h"
 #include "VeloxRuntime.h"
 #include "config/GlutenConfig.h"
-#include "velox/connectors/hive/HiveConfig.h"
-#include "velox/connectors/hive/HiveConnectorSplit.h"
+#include "velox/connectors/odps/OdpsConfig.hpp"
+#include "velox/connectors/odps/OdpsConnectorSplit.h"
 #include "velox/exec/PlanNodeStats.h"
 
 #include "utils/ConfigExtractor.h"
@@ -34,7 +35,7 @@ namespace gluten {
 
 namespace {
 // Velox configs
-const std::string kHiveConnectorId = "test-hive";
+const std::string kOdpsConnectorId = "test-odps";
 
 // memory
 const std::string kSpillStrategy = "spark.gluten.sql.columnar.backend.velox.spillStrategy";
@@ -88,7 +89,7 @@ const std::string kPreloadSplits = "readyPreloadedSplits";
 const std::string kNumWrittenFiles = "numWrittenFiles";
 
 // others
-const std::string kHiveDefaultPartition = "__HIVE_DEFAULT_PARTITION__";
+const std::string kOdpsDefaultPartition = "__ODPS_DEFAULT_PARTITION__";
 
 } // namespace
 
@@ -140,22 +141,21 @@ WholeStageResultIterator::WholeStageResultIterator(
   for (const auto& scanInfo : scanInfos) {
     // Get the information for TableScan.
     // Partition index in scan info is not used.
-    const auto& paths = scanInfo->paths;
-    const auto& starts = scanInfo->starts;
-    const auto& lengths = scanInfo->lengths;
-    const auto& format = scanInfo->format;
-    const auto& partitionColumns = scanInfo->partitionColumns;
+    const auto& sessionId = scanInfo->sessionId;
+    const auto& index = scanInfo->index;
+    const auto& row_index = scanInfo->row_index;
+    const auto& row_count = scanInfo->row_count;
+
+    const auto& projectName = scanInfo->projectName;
+    const auto& schemaName = scanInfo->schemaName;
+    const auto& tableName = scanInfo->tableName;
 
     std::vector<std::shared_ptr<velox::connector::ConnectorSplit>> connectorSplits;
-    connectorSplits.reserve(paths.size());
-    for (int idx = 0; idx < paths.size(); idx++) {
-      auto partitionColumn = partitionColumns[idx];
-      std::unordered_map<std::string, std::optional<std::string>> partitionKeys;
-      constructPartitionColumns(partitionKeys, partitionColumn);
-      auto split = std::make_shared<velox::connector::hive::HiveConnectorSplit>(
-          kHiveConnectorId, paths[idx], format, starts[idx], lengths[idx], partitionKeys);
-      connectorSplits.emplace_back(split);
-    }
+    connectorSplits.reserve(1);
+
+    auto split = std::make_shared<velox::connector::odps::OdpsConnectorSplit>(
+        kOdpsConnectorId, projectName, tableName, schemaName, sessionId, index, row_index, row_count);
+    connectorSplits.emplace_back(split);
 
     std::vector<velox::exec::Split> scanSplits;
     scanSplits.reserve(connectorSplits.size());
@@ -170,7 +170,7 @@ WholeStageResultIterator::WholeStageResultIterator(
 
 std::shared_ptr<velox::core::QueryCtx> WholeStageResultIterator::createNewVeloxQueryCtx() {
   std::unordered_map<std::string, std::shared_ptr<velox::Config>> connectorConfigs;
-  connectorConfigs[kHiveConnectorId] = createConnectorConfig();
+  connectorConfigs[kOdpsConnectorId] = createConnectorConfig();
   std::shared_ptr<velox::core::QueryCtx> ctx = std::make_shared<velox::core::QueryCtx>(
       nullptr,
       facebook::velox::core::QueryConfig{getQueryContextConf()},
@@ -287,7 +287,7 @@ void WholeStageResultIterator::constructPartitionColumns(
     if (!veloxCfg_->get<bool>(kCaseSensitive, false)) {
       folly::toLowerAscii(key);
     }
-    if (value == kHiveDefaultPartition) {
+    if (value == kOdpsDefaultPartition) {
       partitionKeys[key] = std::nullopt;
     } else {
       partitionKeys[key] = value;
@@ -521,15 +521,7 @@ std::unordered_map<std::string, std::string> WholeStageResultIterator::getQueryC
 std::shared_ptr<velox::Config> WholeStageResultIterator::createConnectorConfig() {
   std::unordered_map<std::string, std::string> configs = {};
   // The semantics of reading as lower case is opposite with case-sensitive.
-  configs[velox::connector::hive::HiveConfig::kFileColumnNamesReadAsLowerCaseSession] =
-      veloxCfg_->get<bool>(kCaseSensitive, false) == false ? "true" : "false";
-  configs[velox::connector::hive::HiveConfig::kPartitionPathAsLowerCaseSession] = "false";
-  configs[velox::connector::hive::HiveConfig::kArrowBridgeTimestampUnit] = "6";
-  configs[velox::connector::hive::HiveConfig::kMaxPartitionsPerWritersSession] =
-      std::to_string(veloxCfg_->get<int32_t>(kMaxPartitions, 10000));
-  configs[velox::connector::hive::HiveConfig::kIgnoreMissingFilesSession] =
-      std::to_string(veloxCfg_->get<bool>(kIgnoreMissingFiles, false));
+
   return std::make_shared<velox::core::MemConfig>(configs);
 }
-
 } // namespace gluten

@@ -427,9 +427,9 @@ case class AddTransformHintRule() extends Rule[SparkPlan] {
               transformer.doValidate().tagOnFallback(plan)
             }
           }
-        case plan if HiveTableScanExecTransformer.isHiveTableScan(plan) =>
+        case plan if HiveTableScanExecTransformer.isOdpsTableScan(plan) =>
           if (!enableColumnarHiveTableScan) {
-            TransformHints.tagNotTransformable(plan, "columnar hive table scan is disabled")
+            TransformHints.tagNotTransformable(plan, "columnar odps table scan is disabled")
           } else {
             HiveTableScanExecTransformer.validate(plan).tagOnFallback(plan)
           }

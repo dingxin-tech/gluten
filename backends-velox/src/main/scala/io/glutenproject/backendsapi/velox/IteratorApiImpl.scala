@@ -21,7 +21,7 @@ import io.glutenproject.backendsapi.IteratorApi
 import io.glutenproject.execution._
 import io.glutenproject.metrics.IMetrics
 import io.glutenproject.substrait.plan.PlanNode
-import io.glutenproject.substrait.rel.{LocalFilesBuilder, LocalFilesNode, SplitInfo}
+import io.glutenproject.substrait.rel.{LocalFilesBuilder, OdpsScanNode, SplitInfo}
 import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat
 import io.glutenproject.utils._
 import io.glutenproject.vectorized._
@@ -35,7 +35,8 @@ import org.apache.spark.sql.catalyst.util.{DateFormatter, TimestampFormatter}
 import org.apache.spark.sql.connector.read.InputPartition
 import org.apache.spark.sql.execution.datasources.{FilePartition, PartitionedFile}
 import org.apache.spark.sql.execution.metric.SQLMetric
-import org.apache.spark.sql.types.{BinaryType, DateType, Decimal, DecimalType, StructType, TimestampType}
+import org.apache.spark.sql.odps.{OdpsEmptyColumnPartition, OdpsScanPartition}
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.utils.OASPackageBridge.InputMetricsWrapper
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.ExecutorManager
@@ -68,8 +69,13 @@ class IteratorApiImpl extends IteratorApi with Logging {
           partitionColumns,
           fileFormat,
           preferredLocations.toList.asJava)
+      case f: OdpsScanPartition =>
+        new OdpsScanNode(f.scan.getTableIdentifier, f.inputSplit)
+      case f: OdpsEmptyColumnPartition =>
+        new OdpsScanNode(f.rowCount)
       case _ =>
-        throw new UnsupportedOperationException(s"Unsupported input partition.")
+        throw new UnsupportedOperationException(
+          s"Unsupported input partition type." + partition.getClass.getSimpleName)
     }
   }
 
@@ -86,7 +92,7 @@ class IteratorApiImpl extends IteratorApi with Logging {
         GlutenPartition(
           index,
           planByteArray,
-          splitInfos.map(_.asInstanceOf[LocalFilesNode].toProtobuf.toByteArray).toArray,
+          splitInfos.map(_.asInstanceOf[OdpsScanNode].toProtobuf.toByteArray).toArray,
           splitInfos.flatMap(_.preferredLocations().asScala).toArray
         )
     }

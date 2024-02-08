@@ -580,64 +580,17 @@ object GlutenConfig {
       conf: scala.collection.Map[String, String]): util.Map[String, String] = {
 
     val nativeConfMap = new util.HashMap[String, String]()
-
-    // some configs having default values
-    val keyWithDefault = ImmutableList.of(
-      (SPARK_S3_ACCESS_KEY, ""),
-      (SPARK_S3_SECRET_KEY, ""),
-      (SPARK_S3_ENDPOINT, "localhost:9000"),
-      (SPARK_S3_CONNECTION_SSL_ENABLED, "false"),
-      (SPARK_S3_PATH_STYLE_ACCESS, "true"),
-      (SPARK_S3_USE_INSTANCE_CREDENTIALS, "false"),
-      (SPARK_S3_IAM, ""),
-      (SPARK_S3_IAM_SESSION_NAME, ""),
-      (
-        COLUMNAR_VELOX_CONNECTOR_IO_THREADS.key,
-        COLUMNAR_VELOX_CONNECTOR_IO_THREADS.defaultValueString),
-      (COLUMNAR_SHUFFLE_CODEC.key, ""),
-      (COLUMNAR_SHUFFLE_CODEC_BACKEND.key, ""),
-      ("spark.hadoop.input.connect.timeout", "180000"),
-      ("spark.hadoop.input.read.timeout", "180000"),
-      ("spark.hadoop.input.write.timeout", "180000"),
-      ("spark.hadoop.dfs.client.log.severity", "INFO"),
-      ("spark.sql.orc.compression.codec", "snappy"),
-      (
-        COLUMNAR_VELOX_FILE_HANDLE_CACHE_ENABLED.key,
-        COLUMNAR_VELOX_FILE_HANDLE_CACHE_ENABLED.defaultValueString),
-      (AWS_SDK_LOG_LEVEL.key, AWS_SDK_LOG_LEVEL.defaultValueString)
-    )
-    keyWithDefault.forEach(e => nativeConfMap.put(e._1, conf.getOrElse(e._1, e._2)))
-
-    val keys = ImmutableList.of(
-      GLUTEN_DEBUG_MODE,
-      // datasource config
-      SPARK_SQL_PARQUET_COMPRESSION_CODEC,
-      // datasource config end
-
-      GLUTEN_OFFHEAP_SIZE_IN_BYTES_KEY,
-      GLUTEN_TASK_OFFHEAP_SIZE_IN_BYTES_KEY,
-      GLUTEN_OFFHEAP_ENABLED
-    )
-    keys.forEach(
-      k => {
-        if (conf.contains(k)) {
-          nativeConfMap.put(k, conf(k))
-        }
-      })
-
-    conf
-      .filter(_._1.startsWith(backendPrefix))
-      .foreach(entry => nativeConfMap.put(entry._1, entry._2))
-
-    // put in all S3 configs
-    conf
-      .filter(_._1.startsWith(HADOOP_PREFIX + S3A_PREFIX))
-      .foreach(entry => nativeConfMap.put(entry._1, entry._2))
-
-    conf
-      .filter(_._1.startsWith(SPARK_ABFS_ACCOUNT_KEY))
-      .foreach(entry => nativeConfMap.put(entry._1, entry._2))
-
+    // extract conf from SparkConf send to velox
+    nativeConfMap.put("access_id", conf("spark.hadoop.odps.access.id"))
+    nativeConfMap.put("access_key", conf("spark.hadoop.odps.access.key"))
+    nativeConfMap.put("endpoint", conf("spark.hadoop.odps.end.point"))
+    nativeConfMap.put("default_project", conf("spark.hadoop.odps.project.name"))
+    if (conf.contains("spark.hadoop.odps.tunnel.end.point")) {
+      nativeConfMap.put("tunnel_endpoint", conf("spark.hadoop.odps.tunnel.end.point"))
+    }
+    if (conf.contains("spark.hadoop.odps.tunnel.quota.name")) {
+      nativeConfMap.put("quota_name", conf("spark.hadoop.odps.tunnel.quota.name"))
+    }
     // return
     nativeConfMap
   }
@@ -1195,7 +1148,7 @@ object GlutenConfig {
       .internal()
       .doc("The split preload per task")
       .intConf
-      .createWithDefault(2)
+      .createWithDefault(0)
 
   val COLUMNAR_VELOX_GLOG_VERBOSE_LEVEL =
     buildConf("spark.gluten.sql.columnar.backend.velox.glogVerboseLevel")
@@ -1226,7 +1179,7 @@ object GlutenConfig {
       .internal()
       .doc("The maximum size of a single spill file created")
       .bytesConf(ByteUnit.BYTE)
-      .createWithDefaultString("1GB")
+      .createWithDefaultString("10GB")
 
   val COLUMNAR_VELOX_SPILL_FILE_SYSTEM =
     buildConf("spark.gluten.sql.columnar.backend.velox.spillFileSystem")
@@ -1312,7 +1265,7 @@ object GlutenConfig {
     buildConf("spark.gluten.sql.validation.printStackOnFailure")
       .internal()
       .booleanConf
-      .createWithDefault(false)
+      .createWithDefault(true)
 
   val SOFT_AFFINITY_LOG_LEVEL =
     buildConf("spark.gluten.soft-affinity.logLevel")
@@ -1322,7 +1275,7 @@ object GlutenConfig {
       .checkValue(
         logLevel => Set("TRACE", "DEBUG", "INFO", "WARN", "ERROR").contains(logLevel),
         "Valid values are 'trace', 'debug', 'info', 'warn' and 'error'.")
-      .createWithDefault("DEBUG")
+      .createWithDefault("INFO")
 
   val DEBUG_ENABLED =
     buildConf(GLUTEN_DEBUG_MODE)

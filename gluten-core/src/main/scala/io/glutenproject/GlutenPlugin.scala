@@ -37,6 +37,8 @@ import org.apache.spark.sql.internal.{SQLConf, StaticSQLConf}
 import org.apache.spark.sql.utils.ExpressionUtil
 import org.apache.spark.util.{SparkResourceUtil, TaskResources}
 
+import com.aliyun.odps.commons.util.SvnRevisionUtils
+
 import java.util
 import java.util.{Collections, Objects}
 
@@ -116,6 +118,7 @@ private[glutenproject] class GlutenDriverPlugin extends DriverPlugin with Loggin
     glutenBuildInfo.put("Backend Branch", buildInfo.backendBranch)
     glutenBuildInfo.put("Backend Revision", buildInfo.backendRevision)
     glutenBuildInfo.put("Backend Revision Time", buildInfo.backendRevisionTime)
+    glutenBuildInfo.put("MaxCompute SDK Version", SvnRevisionUtils.getMavenVersion)
     val infoMap = glutenBuildInfo.toMap
     val loggingInfo = infoMap.toSeq
       .sortBy(_._1)

@@ -19,7 +19,8 @@
 
 #include "SubstraitToVeloxExpr.h"
 #include "TypeUtils.h"
-#include "velox/connectors/hive/TableHandle.h"
+#include "velox/connectors/odps/OdpsConnector.h"
+#include "velox/connectors/odps/TableHandle.hpp"
 #include "velox/core/PlanNode.h"
 #include "velox/dwio/common/Options.h"
 
@@ -33,23 +34,15 @@ struct SplitInfo {
   /// Whether the split comes from arrow array stream node.
   bool isStream = false;
 
-  /// The Partition index.
-  u_int32_t partitionIndex;
+  std::string projectName;
+  std::string schemaName;
+  std::string tableName;
 
-  /// The partition columns associated with partitioned table.
-  std::vector<std::unordered_map<std::string, std::string>> partitionColumns;
+  std::string sessionId;
 
-  /// The file paths to be scanned.
-  std::vector<std::string> paths;
-
-  /// The file starts in the scan.
-  std::vector<u_int64_t> starts;
-
-  /// The lengths to be scanned.
-  std::vector<u_int64_t> lengths;
-
-  /// The file format of the files to be scanned.
-  dwio::common::FileFormat format;
+  int index;
+  long row_index;
+  long row_count;
 };
 
 /// This class is used to convert the Substrait plan into Velox plan.
@@ -397,36 +390,11 @@ class SubstraitToVeloxPlanConverter {
       const ::google::protobuf::RepeatedPtrField<::substrait::FunctionArgument>& arguments,
       uint32_t& fieldIndex);
 
-  /// Separate the functions to be two parts:
-  /// subfield functions to be handled by the subfieldFilters in HiveConnector,
-  /// and remaining functions to be handled by the remainingFilter in
-  /// HiveConnector.
-  void separateFilters(
-      std::vector<RangeRecorder>& rangeRecorders,
-      const std::vector<::substrait::Expression_ScalarFunction>& scalarFunctions,
-      std::vector<::substrait::Expression_ScalarFunction>& subfieldFunctions,
-      std::vector<::substrait::Expression_ScalarFunction>& remainingFunctions,
-      const std::vector<::substrait::Expression_SingularOrList>& singularOrLists,
-      std::vector<::substrait::Expression_SingularOrList>& subfieldrOrLists,
-      std::vector<::substrait::Expression_SingularOrList>& remainingrOrLists,
-      const std::vector<TypePtr>& veloxTypeList,
-      const dwio::common::FileFormat& format);
-
   /// Returns whether a function can be pushed down.
   static bool canPushdownFunction(
       const ::substrait::Expression_ScalarFunction& scalarFunction,
       const std::string& filterName,
       uint32_t& fieldIdx);
-
-  /// Returns whether a NOT function can be pushed down.
-  bool canPushdownNot(
-      const ::substrait::Expression_ScalarFunction& scalarFunction,
-      std::vector<RangeRecorder>& rangeRecorders);
-
-  /// Returns whether a OR function can be pushed down.
-  bool canPushdownOr(
-      const ::substrait::Expression_ScalarFunction& scalarFunction,
-      std::vector<RangeRecorder>& rangeRecorders);
 
   /// Returns whether a SingularOrList can be pushed down.
   static bool canPushdownSingularOrList(
@@ -438,82 +406,18 @@ class SubstraitToVeloxPlanConverter {
   /// 'or' expression are effective on the same column.
   static bool childrenFunctionsOnSameField(const ::substrait::Expression_ScalarFunction& function);
 
-  /// Extract the scalar function, and set the filter info for different types
-  /// of columns. If reverse is true, the opposite filter info will be set.
-  void setFilterInfo(
-      const ::substrait::Expression_ScalarFunction& scalarFunction,
-      const std::vector<TypePtr>& inputTypeList,
-      std::vector<FilterInfo>& columnToFilterInfo,
-      bool reverse = false);
-
-  /// Extract SingularOrList and set it to the filter info map.
-  void setFilterInfo(
-      const ::substrait::Expression_SingularOrList& singularOrList,
-      std::vector<FilterInfo>& columnToFilterInfo);
-
   /// Extract SingularOrList and returns the field index.
   static uint32_t getColumnIndexFromSingularOrList(const ::substrait::Expression_SingularOrList&);
 
-  /// Set the filter info for a column base on the information
-  /// extracted from filter condition.
-  static void setColumnFilterInfo(
-      const std::string& filterName,
-      std::optional<variant> literalVariant,
-      FilterInfo& columnToFilterInfo,
-      bool reverse);
 
   /// Create a multirange to specify the filter 'x != notValue' with:
   /// x > notValue or x < notValue.
   template <TypeKind KIND, typename FilterType>
   void createNotEqualFilter(variant notVariant, bool nullAllowed, std::vector<std::unique_ptr<FilterType>>& colFilters);
 
-  /// Create a values range to handle in filter.
-  /// variants: the list of values extracted from the in expression.
-  /// inputName: the column input name.
-  template <TypeKind KIND>
-  void setInFilter(
-      const std::vector<variant>& variants,
-      bool nullAllowed,
-      const std::string& inputName,
-      connector::hive::SubfieldFilters& filters);
-
-  /// Set the constructed filters into SubfieldFilters.
-  /// The FilterType is used to distinguish BigintRange and
-  /// Filter (the base class). This is needed because BigintMultiRange
-  /// can only accept the unique ptr of BigintRange as parameter.
-  template <TypeKind KIND, typename FilterType>
-  void setSubfieldFilter(
-      std::vector<std::unique_ptr<FilterType>> colFilters,
-      const std::string& inputName,
-      bool nullAllowed,
-      connector::hive::SubfieldFilters& filters);
-
-  /// Create the subfield filter based on the constructed filter info.
-  /// inputName: the input name of a column.
-  template <TypeKind KIND, typename FilterType>
-  void constructSubfieldFilters(
-      uint32_t colIdx,
-      const std::string& inputName,
-      const TypePtr& inputType,
-      const FilterInfo& filterInfo,
-      connector::hive::SubfieldFilters& filters);
-
-  /// Construct subfield filters according to the pre-set map of filter info.
-  connector::hive::SubfieldFilters mapToFilters(
-      const std::vector<std::string>& inputNameList,
-      const std::vector<TypePtr>& inputTypeList,
-      std::vector<FilterInfo>& columnToFilterInfo);
-
-  /// Convert subfield functions into subfieldFilters to
-  /// be used in Hive Connector.
-  connector::hive::SubfieldFilters createSubfieldFilters(
-      const std::vector<std::string>& inputNameList,
-      const std::vector<TypePtr>& inputTypeList,
-      const std::vector<::substrait::Expression_ScalarFunction>& subfieldFunctions,
-      const std::vector<::substrait::Expression_SingularOrList>& singularOrLists);
 
   /// Connect all remaining functions with 'and' relation
-  /// for the use of remaingFilter in Hive Connector.
+  /// for the use of remaingFilter in Odps Connector.
   core::TypedExprPtr connectWithAnd(
       std::vector<std::string> inputNameList,
       std::vector<TypePtr> inputTypeList,

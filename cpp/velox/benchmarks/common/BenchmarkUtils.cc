@@ -67,41 +67,25 @@ velox::dwio::common::FileFormat getFileFormat(const std::string& fileFormat) {
   }
 }
 
-std::shared_ptr<gluten::SplitInfo> getSplitInfos(const std::string& datasetPath, const std::string& fileFormat) {
+std::shared_ptr<gluten::SplitInfo> getSplitInfos(const std::string& tableName, const std::string& sessionId) {
   auto scanInfo = std::make_shared<gluten::SplitInfo>();
 
-  // Set format to scan info.
-  scanInfo->format = getFileFormat(fileFormat);
-
-  // Set split start, length, and path to scan info.
-  std::filesystem::path fileDir(datasetPath);
-  for (auto i = std::filesystem::directory_iterator(fileDir); i != std::filesystem::directory_iterator(); i++) {
-    if (!is_directory(i->path())) {
-      std::string singleFilePath = i->path().filename().string();
-      if (endsWith(singleFilePath, "." + fileFormat)) {
-        auto fileAbsolutePath = datasetPath + singleFilePath;
-        scanInfo->starts.emplace_back(0);
-        scanInfo->lengths.emplace_back(fs::file_size(fileAbsolutePath));
-        scanInfo->paths.emplace_back("file://" + fileAbsolutePath);
-      }
-    } else {
-      continue;
-    }
-  }
+  scanInfo->projectName = "schema_hktest";
+  scanInfo->schemaName = "default";
+  scanInfo->tableName = "velox_test";
+  scanInfo->sessionId = "20240308160306c43c730b1885f2c2";
+  scanInfo->index = 0;
   return scanInfo;
 }
 
-std::shared_ptr<gluten::SplitInfo> getSplitInfosFromFile(const std::string& fileName, const std::string& fileFormat) {
+std::shared_ptr<gluten::SplitInfo> getSplitInfosFromFile(const std::string& tableName, const std::string& sessionId) {
   auto scanInfo = std::make_shared<gluten::SplitInfo>();
 
-  // Set format to scan info.
-  scanInfo->format = getFileFormat(fileFormat);
-
-  // Set split start, length, and path to scan info.
-  scanInfo->starts.emplace_back(0);
-  scanInfo->lengths.emplace_back(fs::file_size(fileName));
-  scanInfo->paths.emplace_back("file://" + fileName);
-
+  scanInfo->projectName = "schema_hktest";
+  scanInfo->schemaName = "default";
+  scanInfo->tableName = "velox_test";
+  scanInfo->sessionId = "20240308160306c43c730b1885f2c2";
+  scanInfo->index = 0;
   return scanInfo;
 }
 
