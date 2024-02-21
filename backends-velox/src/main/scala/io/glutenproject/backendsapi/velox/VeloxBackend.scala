@@ -106,7 +106,11 @@ object BackendSettings extends BackendSettingsApi {
           // scalastyle:on println
         }
         unsupportedDataTypes.isEmpty && validateTypes
-      case _ => false
+      case _ =>
+        // scalastyle:off println
+        println(s"Validation failed for ${this.getClass.toString}")
+        // scalastyle:on println
+        true
     }
   }
 

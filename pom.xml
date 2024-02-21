@@ -105,9 +105,6 @@
   <profiles>
     <profile>
       <id>spark-3.2</id>
-      <activation>
-        <activeByDefault>true</activeByDefault>
-      </activation>
       <properties>
         <sparkbundle.version>3.2</sparkbundle.version>
         <sparkshim.artifactId>spark-sql-columnar-shims-spark32</sparkshim.artifactId>
@@ -117,6 +114,9 @@
       </properties>
     </profile>
     <profile>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
       <id>spark-3.3</id>
       <properties>
         <sparkbundle.version>3.3</sparkbundle.version>

@@ -271,7 +271,7 @@ case class TransformPreOverrides(isAdaptiveContext: Boolean)
       }
       TransformHints.tag(newSource, TransformHints.getHint(plan))
       newSource
-    case plan if HiveTableScanExecTransformer.isHiveTableScan(plan) =>
+    case plan if HiveTableScanExecTransformer.isOdpsTableScan(plan) =>
       val newPartitionFilters: Seq[Expression] = ExpressionConverter.transformDynamicPruningExpr(
         HiveTableScanExecTransformer.getPartitionFilters(plan),
         reuseSubquery)
@@ -314,7 +314,7 @@ case class TransformPreOverrides(isAdaptiveContext: Boolean)
             return applyScanNotTransformable(plan)
           case plan: FileSourceScanExec =>
             return applyScanNotTransformable(plan)
-          case plan if HiveTableScanExecTransformer.isHiveTableScan(plan) =>
+          case plan if HiveTableScanExecTransformer.isOdpsTableScan(plan) =>
             return applyScanNotTransformable(plan)
           case p =>
             return p.withNewChildren(p.children.map(replaceWithTransformerPlan))
@@ -325,7 +325,7 @@ case class TransformPreOverrides(isAdaptiveContext: Boolean)
         applyScanTransformer(plan)
       case plan: FileSourceScanExec =>
         applyScanTransformer(plan)
-      case plan if HiveTableScanExecTransformer.isHiveTableScan(plan) =>
+      case plan if HiveTableScanExecTransformer.isOdpsTableScan(plan) =>
         applyScanTransformer(plan)
       case plan: CoalesceExec =>
         logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
@@ -579,7 +579,7 @@ case class TransformPreOverrides(isAdaptiveContext: Boolean)
         TransformHints.tagNotTransformable(newSource, validationResult.reason.get)
         newSource
       }
-    case plan if HiveTableScanExecTransformer.isHiveTableScan(plan) =>
+    case plan if HiveTableScanExecTransformer.isOdpsTableScan(plan) =>
       // TODO: Add DynamicPartitionPruningHiveScanSuite.scala
       val newPartitionFilters: Seq[Expression] = ExpressionConverter.transformDynamicPruningExpr(
         HiveTableScanExecTransformer.getPartitionFilters(plan),
