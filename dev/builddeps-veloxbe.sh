@@ -97,9 +97,12 @@ do
     esac
 done
 
-if [ "$ENABLE_VCPKG" = "ON" ]; then
-    envs="$("$GLUTEN_DIR/dev/vcpkg/setup-build-depends.sh")"
+if [ "$SKIP_BUILD_EP" != "ON" ]; then
+    nvs="$("$GLUTEN_DIR/dev/vcpkg/setup-build-depends.sh")"
     eval "$envs"
+fi
+
+if [ "$ENABLE_VCPKG" = "ON" ]; then
     source /opt/rh/devtoolset-9/enable
     # vcpkg will install static depends and init build environment
     envs="$("$GLUTEN_DIR/dev/vcpkg/init.sh")"
