@@ -37,6 +37,8 @@ install_centos_7() {
         bison \
         java-1.8.0-openjdk java-1.8.0-openjdk-devel
 
+    sudo ln -s /usr/bin/cmake3 /usr/bin/cmake
+
     # git>2.7.4
     if [[ "$(git --version)" != "git version 2."* ]]; then
         [ -f /etc/yum.repos.d/ius.repo ] || yum -y install https://repo.ius.io/ius-release-el7.rpm

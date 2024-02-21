@@ -98,6 +98,9 @@ do
 done
 
 if [ "$ENABLE_VCPKG" = "ON" ]; then
+    envs="$("$GLUTEN_DIR/dev/vcpkg/setup-build-depends.sh")"
+    eval "$envs"
+    source /opt/rh/devtoolset-9/enable
     # vcpkg will install static depends and init build environment
     envs="$("$GLUTEN_DIR/dev/vcpkg/init.sh")"
     eval "$envs"
