@@ -210,7 +210,7 @@
     <profile>
       <id>backends-velox</id>
       <activation>
-        <activeByDefault>false</activeByDefault>
+        <activeByDefault>true</activeByDefault>
       </activation>
       <modules>
         <module>gluten-data</module>
@@ -232,6 +232,22 @@
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>com.aliyun.odps</groupId>
+        <artifactId>spark-odps-hive_2.12</artifactId>
+        <version>3.3.1-odps0.46.0</version>
+        <scope>provided</scope>
+        <exclusions>
+          <exclusion>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-hive_${scala.binary.version}</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.lz4</groupId>
+            <artifactId>lz4-java</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
       <dependency>
         <groupId>com.github.ben-manes.caffeine</groupId>
         <artifactId>caffeine</artifactId>
