@@ -38,7 +38,6 @@ import org.apache.spark.sql.vectorized.ColumnarBatch
 
 import com.google.common.collect.Lists
 
-import scala.collection.JavaConverters._
 import scala.collection.mutable
 
 case class TransformContext(
@@ -279,10 +278,7 @@ case class WholeStageTransformer(child: SparkPlan, materializeInput: Boolean = f
             wsCxt.substraitContext.initSplitInfosIndex(0)
             wsCxt.substraitContext.setSplitInfos(splitInfos)
             val substraitPlan = wsCxt.root.toProtobuf
-            GlutenPartition(
-              index,
-              substraitPlan.toByteArray,
-              splitInfos.flatMap(_.preferredLocations().asScala).toArray)
+            GlutenPartition(index, substraitPlan.toByteArray)
         }
         (wsCxt, substraitPlanPartitions)
       }(

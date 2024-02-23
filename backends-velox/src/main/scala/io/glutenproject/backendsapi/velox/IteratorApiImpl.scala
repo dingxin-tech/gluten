@@ -21,10 +21,12 @@ import io.glutenproject.backendsapi.IteratorApi
 import io.glutenproject.execution._
 import io.glutenproject.metrics.IMetrics
 import io.glutenproject.substrait.plan.PlanNode
-import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat
 import io.glutenproject.substrait.rel.{LocalFilesBuilder, OdpsScanNode, SplitInfo}
+import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat
 import io.glutenproject.utils.Iterators
 import io.glutenproject.vectorized._
+
+import org.apache.spark.{SparkConf, SparkContext, TaskContext}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
@@ -40,13 +42,13 @@ import org.apache.spark.sql.types.{BinaryType, DateType, StructType, TimestampTy
 import org.apache.spark.sql.utils.OASPackageBridge.InputMetricsWrapper
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.ExecutorManager
-import org.apache.spark.{SparkConf, SparkContext, TaskContext}
 
 import java.lang.{Long => JLong}
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.time.ZoneOffset
 import java.util.{ArrayList => JArrayList, HashMap => JHashMap, Map => JMap}
+
 import scala.collection.JavaConverters._
 
 class IteratorApiImpl extends IteratorApi with Logging {
