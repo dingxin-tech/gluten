@@ -16,17 +16,16 @@
  */
 package io.glutenproject.backendsapi.velox
 
+import com.aliyun.odps.table.read.split.impl.IndexedInputSplit
 import io.glutenproject.GlutenNumaBindingInfo
 import io.glutenproject.backendsapi.IteratorApi
 import io.glutenproject.execution._
 import io.glutenproject.metrics.IMetrics
 import io.glutenproject.substrait.plan.PlanNode
-import io.glutenproject.substrait.rel.{LocalFilesBuilder, SplitInfo}
 import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat
+import io.glutenproject.substrait.rel.{LocalFilesBuilder, SplitInfo}
 import io.glutenproject.utils.Iterators
 import io.glutenproject.vectorized._
-
-import org.apache.spark.{SparkConf, SparkContext, TaskContext}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
@@ -37,17 +36,18 @@ import org.apache.spark.sql.connector.read.InputPartition
 import org.apache.spark.sql.execution.datasources.{FilePartition, PartitionedFile}
 import org.apache.spark.sql.execution.joins.BuildSideRelation
 import org.apache.spark.sql.execution.metric.SQLMetric
+import org.apache.spark.sql.odps.OdpsScanPartition
 import org.apache.spark.sql.types.{BinaryType, DateType, StructType, TimestampType}
 import org.apache.spark.sql.utils.OASPackageBridge.InputMetricsWrapper
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.ExecutorManager
+import org.apache.spark.{SparkConf, SparkContext, TaskContext}
 
 import java.lang.{Long => JLong}
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.time.ZoneOffset
 import java.util.{ArrayList => JArrayList, HashMap => JHashMap, Map => JMap}
-
 import scala.collection.JavaConverters._
 
 class IteratorApiImpl extends IteratorApi with Logging {
@@ -75,6 +75,18 @@ class IteratorApiImpl extends IteratorApi with Logging {
           partitionColumns,
           fileFormat,
           preferredLocations.toList.asJava)
+      case f: OdpsScanPartition =>
+        // FIXME: to implement [dingxin]
+        var inputSplit = f.inputSplit
+        inputSplit match {
+          case split: IndexedInputSplit =>
+            //var index = inputSplit.asInstanceOf[IndexedInputSplit].getSplitIndex
+            var sessionId = split.getSessionId
+            LocalFilesBuilder.makeLocalFiles(sessionId)
+          case _ =>
+        }
+
+        null
       case _ =>
         throw new UnsupportedOperationException(s"Unsupported input partition.")
     }

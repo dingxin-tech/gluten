@@ -375,6 +375,7 @@ case class WholeStageTransformer(child: SparkPlan, materializeInput: Boolean = f
     //  p14  |  p24
     //      ...
     //  p1n  |  p2n    => substraitContext.setSplitInfo([p1n, p2n])
+    // TODO: maybe ODPS Scan don't need to be combined [dingxin]
     val allScanSplitInfos = basicScanExecTransformers.map(_.getSplitInfos)
     val partitionLength = allScanSplitInfos.head.size
     if (allScanSplitInfos.exists(_.size != partitionLength)) {
