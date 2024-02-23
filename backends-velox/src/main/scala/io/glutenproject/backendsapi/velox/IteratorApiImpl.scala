@@ -16,7 +16,7 @@
  */
 package io.glutenproject.backendsapi.velox
 
-import com.aliyun.odps.table.read.split.impl.IndexedInputSplit
+import com.aliyun.odps.table.read.split.impl.{IndexedInputSplit, RowRangeInputSplit}
 import io.glutenproject.GlutenNumaBindingInfo
 import io.glutenproject.backendsapi.IteratorApi
 import io.glutenproject.execution._
@@ -78,17 +78,18 @@ class IteratorApiImpl extends IteratorApi with Logging {
       case f: OdpsScanPartition =>
         // FIXME: to implement [dingxin]
         var inputSplit = f.inputSplit
+        var sessionId = inputSplit.getSessionId
         inputSplit match {
           case split: IndexedInputSplit =>
             //var index = inputSplit.asInstanceOf[IndexedInputSplit].getSplitIndex
-            var sessionId = split.getSessionId
+            LocalFilesBuilder.makeLocalFiles(sessionId)
+          case split: RowRangeInputSplit =>
             LocalFilesBuilder.makeLocalFiles(sessionId)
           case _ =>
+            throw new UnsupportedOperationException(s"Unsupported odps input partition type." + inputSplit.getClass.getSimpleName)
         }
-
-        null
       case _ =>
-        throw new UnsupportedOperationException(s"Unsupported input partition.")
+        throw new UnsupportedOperationException(s"Unsupported input partition type." + partition.getClass.getSimpleName)
     }
   }
 
