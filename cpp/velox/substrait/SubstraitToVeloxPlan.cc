@@ -1119,6 +1119,7 @@ int32_t SubstraitToVeloxPlanConverter::getStreamIndex(const ::substrait::ReadRel
   if (validationMode_) {
     return -1;
   }
+  return 0;
 //  VELOX_FAIL("Local file is expected.");
 }
 

@@ -413,6 +413,7 @@ class ColumnarInputRDDsWrapper(columnarInputRDDs: Seq[RDD[ColumnarBatch]]) exten
   }
 
   def getIterators(
+                  // TODO: RDD is always empty? [dingxin]
       inputColumnarRDDPartitions: Seq[Partition],
       context: TaskContext): Seq[Iterator[ColumnarBatch]] = {
     var index = 0
