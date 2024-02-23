@@ -1112,6 +1112,9 @@ int32_t SubstraitToVeloxPlanConverter::getStreamIndex(const ::substrait::ReadRel
     } catch (const std::exception& err) {
       VELOX_FAIL(err.what());
     }
+  } else if (sRead.has_extension_table()) {
+    // TODO: if there deal with odps proto ? [dingxin]
+    return 0;
   }
   if (validationMode_) {
     return -1;
