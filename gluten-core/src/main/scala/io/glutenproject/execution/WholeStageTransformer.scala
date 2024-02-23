@@ -18,7 +18,6 @@ package io.glutenproject.execution
 
 import io.glutenproject.{GlutenConfig, GlutenNumaBindingInfo}
 import io.glutenproject.backendsapi.BackendsApiManager
-import io.glutenproject.exception.GlutenException
 import io.glutenproject.expression._
 import io.glutenproject.extension.GlutenPlan
 import io.glutenproject.metrics.{GlutenTimeMetric, MetricsUpdater, NoopMetricsUpdater}
@@ -28,7 +27,7 @@ import io.glutenproject.substrait.plan.{PlanBuilder, PlanNode}
 import io.glutenproject.substrait.rel.{RelNode, SplitInfo}
 import io.glutenproject.utils.SubstraitPlanPrinterUtil
 
-import org.apache.spark.{Dependency, OneToOneDependency, Partition, SparkConf, TaskContext}
+import org.apache.spark._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, SortOrder}
