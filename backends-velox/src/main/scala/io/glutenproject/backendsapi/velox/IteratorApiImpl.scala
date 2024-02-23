@@ -23,7 +23,7 @@ import io.glutenproject.execution._
 import io.glutenproject.metrics.IMetrics
 import io.glutenproject.substrait.plan.PlanNode
 import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat
-import io.glutenproject.substrait.rel.{LocalFilesBuilder, SplitInfo}
+import io.glutenproject.substrait.rel.{LocalFilesBuilder, OdpsScanNode, SplitInfo}
 import io.glutenproject.utils.Iterators
 import io.glutenproject.vectorized._
 import org.apache.spark.broadcast.Broadcast
@@ -77,17 +77,7 @@ class IteratorApiImpl extends IteratorApi with Logging {
           preferredLocations.toList.asJava)
       case f: OdpsScanPartition =>
         // FIXME: to implement [dingxin]
-        var inputSplit = f.inputSplit
-        var sessionId = inputSplit.getSessionId
-        inputSplit match {
-          case split: IndexedInputSplit =>
-            //var index = inputSplit.asInstanceOf[IndexedInputSplit].getSplitIndex
-            LocalFilesBuilder.makeLocalFiles(sessionId)
-          case split: RowRangeInputSplit =>
-            LocalFilesBuilder.makeLocalFiles(sessionId)
-          case _ =>
-            throw new UnsupportedOperationException(s"Unsupported odps input partition type." + inputSplit.getClass.getSimpleName)
-        }
+        new OdpsScanNode(f.inputSplit)
       case _ =>
         throw new UnsupportedOperationException(s"Unsupported input partition type." + partition.getClass.getSimpleName)
     }
