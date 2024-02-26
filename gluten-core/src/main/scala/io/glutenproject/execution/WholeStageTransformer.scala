@@ -28,12 +28,14 @@ import io.glutenproject.substrait.rel.{RelNode, SplitInfo}
 import io.glutenproject.utils.SubstraitPlanPrinterUtil
 
 import org.apache.spark._
+import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, SortOrder}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.metric.SQLMetric
+import org.apache.spark.sql.hive.HiveTableScanExecTransformer
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 import com.google.common.collect.Lists
@@ -73,6 +75,8 @@ trait TransformSupport extends GlutenPlan {
 
   protected def getColumnarInputRDDs(plan: SparkPlan): Seq[RDD[ColumnarBatch]] = {
     plan match {
+      case odps: HiveTableScanExecTransformer =>
+        Seq(plan.executeColumnar())
       case c: TransformSupport =>
         c.columnarInputRDDs
       case _ =>
@@ -386,7 +390,9 @@ case class WholeStageTransformer(child: SparkPlan, materializeInput: Boolean = f
  * partition of [[BroadcastBuildSideRDD]] is meaningless. [[BroadcastBuildSideRDD]] should only be
  * used to hold the broadcast value and generate iterator for join.
  */
-class ColumnarInputRDDsWrapper(columnarInputRDDs: Seq[RDD[ColumnarBatch]]) extends Serializable {
+class ColumnarInputRDDsWrapper(columnarInputRDDs: Seq[RDD[ColumnarBatch]])
+  extends Serializable
+  with Logging {
   def getDependencies: Seq[Dependency[ColumnarBatch]] = {
     assert(
       columnarInputRDDs
@@ -413,10 +419,11 @@ class ColumnarInputRDDsWrapper(columnarInputRDDs: Seq[RDD[ColumnarBatch]]) exten
   }
 
   def getIterators(
-                  // TODO: RDD is always empty? [dingxin]
+      // TODO: RDD is always empty? [dingxin]
       inputColumnarRDDPartitions: Seq[Partition],
       context: TaskContext): Seq[Iterator[ColumnarBatch]] = {
     var index = 0
+    logWarning(s"inputColumnarRDDPartitions Length: ${inputColumnarRDDPartitions.length}")
     columnarInputRDDs.map {
       case broadcast: BroadcastBuildSideRDD =>
         BackendsApiManager.getIteratorApiInstance
@@ -425,6 +432,8 @@ class ColumnarInputRDDsWrapper(columnarInputRDDs: Seq[RDD[ColumnarBatch]]) exten
         val it = rdd.iterator(inputColumnarRDDPartitions(index), context)
         index += 1
         it
+      case _ =>
+        throw new RuntimeException(s"Actual case: ${rdd.getClass.getName}")
     }
   }
 }
