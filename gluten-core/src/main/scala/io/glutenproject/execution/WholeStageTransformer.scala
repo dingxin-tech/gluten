@@ -432,8 +432,6 @@ class ColumnarInputRDDsWrapper(columnarInputRDDs: Seq[RDD[ColumnarBatch]])
         val it = rdd.iterator(inputColumnarRDDPartitions(index), context)
         index += 1
         it
-      case _ =>
-        throw new RuntimeException(s"Actual case: ${rdd.getClass.getName}")
     }
   }
 }

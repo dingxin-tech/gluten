@@ -57,7 +57,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration.{Duration, NANOSECONDS}
 
 class HiveTableScanExecTransformer(
     @transient relation: HiveTableRelation,
@@ -101,15 +101,35 @@ class HiveTableScanExecTransformer(
   override def metricsUpdater(): MetricsUpdater =
     BackendsApiManager.getMetricsApiInstance.genHiveTableScanTransformerMetricsUpdater(metrics)
 
-  override def doExecuteColumnar(): RDD[ColumnarBatch] = {
-    doExecuteColumnarInternal()
-  }
+  // Velox don't support this method
 
   @transient private lazy val partitions: Seq[InputPartition] = createPartitions()
 
   /**
    * **** copy from OdpsTableScanExec start *****
    */
+  override def doExecuteColumnar(): RDD[ColumnarBatch] = {
+    val numOutputRows = longMetric("numOutputRows")
+    val scanTime = longMetric("scanTime")
+    inputRDD.asInstanceOf[RDD[ColumnarBatch]].mapPartitionsInternal {
+      batches =>
+        new Iterator[ColumnarBatch] {
+
+          override def hasNext: Boolean = {
+            val startNs = System.nanoTime()
+            val res = batches.hasNext
+            scanTime += NANOSECONDS.toMillis(System.nanoTime() - startNs)
+            res
+          }
+
+          override def next(): ColumnarBatch = {
+            val batch = batches.next()
+            numOutputRows += batch.numRows()
+            batch
+          }
+        }
+    }
+  }
 
   private val requestedAttributes = readDataColumns ++ readPartitionColumns
 

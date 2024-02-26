@@ -58,6 +58,7 @@ trait BasicScanExecTransformer extends LeafTransformSupport with SupportFormat {
       BackendsApiManager.getIteratorApiInstance
         .genSplitInfo(_, getPartitionSchemas, fileFormat))
 
+  // Velox don't support this method
   def doExecuteColumnarInternal(): RDD[ColumnarBatch] = {
     val numOutputRows = longMetric("outputRows")
     val numOutputVectors = longMetric("outputVectors")
