@@ -73,9 +73,11 @@ class HiveTableScanExecTransformer(
     dataFilters)(session)
   with BasicScanExecTransformer {
 
+  private val parentMetrics = super.metrics
+
   @transient override lazy val metrics: Map[String, SQLMetric] =
     BackendsApiManager.getMetricsApiInstance.genHiveTableScanTransformerMetrics(
-      sparkContext) ++ super.metrics
+      sparkContext) ++ parentMetrics
 
 //  @transient private lazy val hiveQlTable = HiveClientImpl.toHiveTable(relation.tableMeta)
 
