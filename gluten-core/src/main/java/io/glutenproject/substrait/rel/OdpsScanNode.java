@@ -20,9 +20,9 @@ import com.aliyun.odps.table.read.split.InputSplit;
 import com.aliyun.odps.table.read.split.impl.IndexedInputSplit;
 import com.google.protobuf.Any;
 import com.google.protobuf.MessageOrBuilder;
-import com.google.protobuf.StringValue;
 import io.substrait.proto.ReadRel.ExtensionTable;
 import io.substrait.proto.ReadRel.ExtensionTable.Builder;
+import io.substrait.proto.ReadRel.OdpsScanSplit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,9 +50,7 @@ public class OdpsScanNode implements SplitInfo {
 
   @Override
   public MessageOrBuilder toProtobuf() {
+    OdpsScanSplit odpsScanSplit =
+        OdpsScanSplit.newBuilder().setSessionId(sessionId).setIndex(index).build();
     Builder builder = ExtensionTable.newBuilder();
-    StringValue details = StringValue.newBuilder().setValue(sessionId + ":" + index).build();
-    builder.setDetail(Any.pack(details));
-    return builder.build();
-  }
-}
+    builder.setDetail(Any.pack(odpsScanSpli

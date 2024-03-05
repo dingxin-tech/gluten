@@ -77,7 +77,6 @@ class IteratorApiImpl extends IteratorApi with Logging {
           fileFormat,
           preferredLocations.toList.asJava)
       case f: OdpsScanPartition =>
-        // FIXME: to implement [dingxin]
         new OdpsScanNode(f.inputSplit)
       case _ =>
         throw new UnsupportedOperationException(

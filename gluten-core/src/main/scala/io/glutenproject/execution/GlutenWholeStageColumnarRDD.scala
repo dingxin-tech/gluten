@@ -20,6 +20,8 @@ import io.glutenproject.GlutenConfig
 import io.glutenproject.backendsapi.BackendsApiManager
 import io.glutenproject.metrics.{GlutenTimeMetric, IMetrics}
 import io.glutenproject.substrait.plan.PlanBuilder
+
+import org.apache.spark.{Partition, SparkContext, SparkException, TaskContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.connector.read.InputPartition
 import org.apache.spark.sql.execution.datasources.PartitionedFile
@@ -27,7 +29,6 @@ import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.utils.OASPackageBridge.InputMetricsWrapper
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.ExecutorManager
-import org.apache.spark.{Partition, SparkContext, SparkException, TaskContext}
 
 import scala.collection.mutable
 

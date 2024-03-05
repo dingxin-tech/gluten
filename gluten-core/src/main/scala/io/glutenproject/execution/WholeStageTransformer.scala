@@ -75,8 +75,6 @@ trait TransformSupport extends GlutenPlan {
 
   protected def getColumnarInputRDDs(plan: SparkPlan): Seq[RDD[ColumnarBatch]] = {
     plan match {
-      case odps: HiveTableScanExecTransformer =>
-        Seq(plan.executeColumnar())
       case c: TransformSupport =>
         c.columnarInputRDDs
       case _ =>

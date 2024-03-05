@@ -19,10 +19,11 @@
 
 #include "SubstraitToVeloxExpr.h"
 #include "TypeUtils.h"
-#include "velox/connectors/hive/HiveConnector.h"
-#include "velox/connectors/hive/TableHandle.h"
+#include "velox/connectors/odps/HiveConnector.h"
+#include "velox/connectors/odps/TableHandle.h"
 #include "velox/core/PlanNode.h"
 #include "velox/dwio/common/Options.h"
+#include <string>
 
 namespace gluten {
 
@@ -30,23 +31,13 @@ struct SplitInfo {
   /// Whether the split comes from arrow array stream node.
   bool isStream = false;
 
-  /// The Partition index.
-  u_int32_t partitionIndex;
+  string projectName;
+  string schemaName;
+  string tableName;
 
-  /// The partition columns associated with partitioned table.
-  std::vector<std::unordered_map<std::string, std::string>> partitionColumns;
+  string sessionId;
 
-  /// The file paths to be scanned.
-  std::vector<std::string> paths;
-
-  /// The file starts in the scan.
-  std::vector<u_int64_t> starts;
-
-  /// The lengths to be scanned.
-  std::vector<u_int64_t> lengths;
-
-  /// The file format of the files to be scanned.
-  dwio::common::FileFormat format;
+  int index;
 };
 
 /// This class is used to convert the Substrait plan into Velox plan.
@@ -179,161 +170,6 @@ class SubstraitToVeloxPlanConverter {
   /// Check the Substrait type extension only has one unknown extension.
   static bool checkTypeExtension(const ::substrait::Plan& substraitPlan);
 
-  /// Range filter recorder for a field is used to make sure only the conditions
-  /// that can coexist for this field being pushed down with a range filter.
-  class RangeRecorder {
-   public:
-    /// Set the existence of values range and returns whether this condition can
-    /// coexist with existing conditions for one field. Conditions in OR
-    /// relation can coexist with each other.
-    bool setInRange(bool forOrRelation = false) {
-      if (forOrRelation) {
-        return true;
-      }
-      if (inRange_ || multiRange_ || leftBound_ || rightBound_) {
-        return false;
-      }
-      inRange_ = true;
-      return true;
-    }
-
-    /// Set the existence of left bound and returns whether it can coexist with
-    /// existing conditions for this field.
-    bool setLeftBound(bool forOrRelation = false) {
-      if (forOrRelation) {
-        if (!rightBound_)
-          leftBound_ = true;
-        return !rightBound_;
-      }
-      if (leftBound_ || inRange_ || multiRange_) {
-        return false;
-      }
-      leftBound_ = true;
-      return true;
-    }
-
-    /// Set the existence of right bound and returns whether it can coexist with
-    /// existing conditions for this field.
-    bool setRightBound(bool forOrRelation = false) {
-      if (forOrRelation) {
-        if (!leftBound_)
-          rightBound_ = true;
-        return !leftBound_;
-      }
-      if (rightBound_ || inRange_ || multiRange_) {
-        return false;
-      }
-      rightBound_ = true;
-      return true;
-    }
-
-    /// Set the multi-range and returns whether it can coexist with
-    /// existing conditions for this field.
-    bool setMultiRange() {
-      if (inRange_ || multiRange_ || leftBound_ || rightBound_) {
-        return false;
-      }
-      multiRange_ = true;
-      return true;
-    }
-
-    /// Set certain existence according to function name and returns whether it
-    /// can coexist with existing conditions for this field.
-    bool setCertainRangeForFunction(const std::string& functionName, bool reverse = false, bool forOrRelation = false);
-
-   private:
-    /// The existence of values range.
-    bool inRange_ = false;
-
-    /// The existence of left bound.
-    bool leftBound_ = false;
-
-    /// The existence of right bound.
-    bool rightBound_ = false;
-
-    /// The existence of multi-range.
-    bool multiRange_ = false;
-  };
-
-  /// Filter info for a column used in filter push down.
-  class FilterInfo {
-   public:
-    // Disable null allow.
-    void forbidsNull() {
-      nullAllowed_ = false;
-      if (!initialized_) {
-        initialized_ = true;
-      }
-    }
-
-    // Return the initialization status.
-    bool isInitialized() const {
-      return initialized_;
-    }
-
-    // Add a lower bound to the range. Multiple lower bounds are
-    // regarded to be in 'or' relation.
-    void setLower(const std::optional<variant>& left, bool isExclusive) {
-      lowerBounds_.emplace_back(left);
-      lowerExclusives_.emplace_back(isExclusive);
-      if (!initialized_) {
-        initialized_ = true;
-      }
-    }
-
-    // Add a upper bound to the range. Multiple upper bounds are
-    // regarded to be in 'or' relation.
-    void setUpper(const std::optional<variant>& right, bool isExclusive) {
-      upperBounds_.emplace_back(right);
-      upperExclusives_.emplace_back(isExclusive);
-      if (!initialized_) {
-        initialized_ = true;
-      }
-    }
-
-    // Set a list of values to be used in the push down of 'in' expression.
-    void setValues(const std::vector<variant>& values) {
-      for (const auto& value : values) {
-        values_.emplace_back(value);
-      }
-      if (!initialized_) {
-        initialized_ = true;
-      }
-    }
-
-    // Set a value for the not(equal) condition.
-    void setNotValue(const std::optional<variant>& notValue) {
-      notValue_ = notValue;
-      if (!initialized_) {
-        initialized_ = true;
-      }
-    }
-
-    // Whether this filter map is initialized.
-    bool initialized_ = false;
-
-    // The null allow.
-    bool nullAllowed_ = false;
-
-    // If true, left bound will be exclusive.
-    std::vector<bool> lowerExclusives_;
-
-    // If true, right bound will be exclusive.
-    std::vector<bool> upperExclusives_;
-
-    // A value should not be equal to.
-    std::optional<variant> notValue_ = std::nullopt;
-
-    // The lower bounds in 'or' relation.
-    std::vector<std::optional<variant>> lowerBounds_;
-
-    // The upper bounds in 'or' relation.
-    std::vector<std::optional<variant>> upperBounds_;
-
-    // The list of values used in 'in' expression.
-    std::vector<variant> values_;
-  };
-
   /// Returns unique ID to use for plan node. Produces sequential numbers
   /// starting from zero.
   std::string nextPlanNodeId();
@@ -343,21 +179,6 @@ class SubstraitToVeloxPlanConverter {
   static bool fieldOrWithLiteral(
       const ::google::protobuf::RepeatedPtrField<::substrait::FunctionArgument>& arguments,
       uint32_t& fieldIndex);
-
-  /// Separate the functions to be two parts:
-  /// subfield functions to be handled by the subfieldFilters in HiveConnector,
-  /// and remaining functions to be handled by the remainingFilter in
-  /// HiveConnector.
-  void separateFilters(
-      std::vector<RangeRecorder>& rangeRecorders,
-      const std::vector<::substrait::Expression_ScalarFunction>& scalarFunctions,
-      std::vector<::substrait::Expression_ScalarFunction>& subfieldFunctions,
-      std::vector<::substrait::Expression_ScalarFunction>& remainingFunctions,
-      const std::vector<::substrait::Expression_SingularOrList>& singularOrLists,
-      std::vector<::substrait::Expression_SingularOrList>& subfieldrOrLists,
-      std::vector<::substrait::Expression_SingularOrList>& remainingrOrLists,
-      const std::vector<TypePtr>& veloxTypeList,
-      const dwio::common::FileFormat& format);
 
   /// Returns whether a function can be pushed down.
   static bool canPushdownCommonFunction(
@@ -385,79 +206,15 @@ class SubstraitToVeloxPlanConverter {
   /// 'or' expression are effective on the same column.
   static bool childrenFunctionsOnSameField(const ::substrait::Expression_ScalarFunction& function);
 
-  /// Extract the scalar function, and set the filter info for different types
-  /// of columns. If reverse is true, the opposite filter info will be set.
-  void setFilterInfo(
-      const ::substrait::Expression_ScalarFunction& scalarFunction,
-      const std::vector<TypePtr>& inputTypeList,
-      std::vector<FilterInfo>& columnToFilterInfo,
-      bool reverse = false);
-
-  /// Extract SingularOrList and set it to the filter info map.
-  void setFilterInfo(
-      const ::substrait::Expression_SingularOrList& singularOrList,
-      std::vector<FilterInfo>& columnToFilterInfo);
-
   /// Extract SingularOrList and returns the field index.
   static uint32_t getColumnIndexFromSingularOrList(const ::substrait::Expression_SingularOrList&);
 
-  /// Set the filter info for a column base on the information
-  /// extracted from filter condition.
-  static void setColumnFilterInfo(
-      const std::string& filterName,
-      std::optional<variant> literalVariant,
-      FilterInfo& columnToFilterInfo,
-      bool reverse);
 
   /// Create a multirange to specify the filter 'x != notValue' with:
   /// x > notValue or x < notValue.
   template <TypeKind KIND, typename FilterType>
   void createNotEqualFilter(variant notVariant, bool nullAllowed, std::vector<std::unique_ptr<FilterType>>& colFilters);
 
-  /// Create a values range to handle in filter.
-  /// variants: the list of values extracted from the in expression.
-  /// inputName: the column input name.
-  template <TypeKind KIND>
-  void setInFilter(
-      const std::vector<variant>& variants,
-      bool nullAllowed,
-      const std::string& inputName,
-      connector::hive::SubfieldFilters& filters);
-
-  /// Set the constructed filters into SubfieldFilters.
-  /// The FilterType is used to distinguish BigintRange and
-  /// Filter (the base class). This is needed because BigintMultiRange
-  /// can only accept the unique ptr of BigintRange as parameter.
-  template <TypeKind KIND, typename FilterType>
-  void setSubfieldFilter(
-      std::vector<std::unique_ptr<FilterType>> colFilters,
-      const std::string& inputName,
-      bool nullAllowed,
-      connector::hive::SubfieldFilters& filters);
-
-  /// Create the subfield filter based on the constructed filter info.
-  /// inputName: the input name of a column.
-  template <TypeKind KIND, typename FilterType>
-  void constructSubfieldFilters(
-      uint32_t colIdx,
-      const std::string& inputName,
-      const TypePtr& inputType,
-      const FilterInfo& filterInfo,
-      connector::hive::SubfieldFilters& filters);
-
-  /// Construct subfield filters according to the pre-set map of filter info.
-  connector::hive::SubfieldFilters mapToFilters(
-      const std::vector<std::string>& inputNameList,
-      const std::vector<TypePtr>& inputTypeList,
-      std::vector<FilterInfo>& columnToFilterInfo);
-
-  /// Convert subfield functions into subfieldFilters to
-  /// be used in Hive Connector.
-  connector::hive::SubfieldFilters createSubfieldFilters(
-      const std::vector<std::string>& inputNameList,
-      const std::vector<TypePtr>& inputTypeList,
-      const std::vector<::substrait::Expression_ScalarFunction>& subfieldFunctions,
-      const std::vector<::substrait::Expression_SingularOrList>& singularOrLists);
 
   /// Connect all remaining functions with 'and' relation
   /// for the use of remaingFilter in Hive Connector.
@@ -487,9 +244,6 @@ class SubstraitToVeloxPlanConverter {
 
   /// The unique identification for each PlanNode.
   int planNodeId_ = 0;
-
-  // used to check whether IsNotNull Filter is support
-  facebook::velox::dwio::common::FileFormat fileFormat_ = facebook::velox::dwio::common::FileFormat::UNKNOWN;
 
   /// The map storing the relations between the function id and the function
   /// name. Will be constructed based on the Substrait representation.

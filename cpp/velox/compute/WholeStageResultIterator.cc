@@ -18,8 +18,8 @@
 #include "VeloxBackend.h"
 #include "VeloxRuntime.h"
 #include "config/GlutenConfig.h"
-#include "velox/connectors/hive/HiveConfig.h"
-#include "velox/connectors/hive/HiveConnectorSplit.h"
+#include "velox/connectors/odps/OdpsConfig.h"
+#include "velox/connectors/odps/OdpsConnectorSplit.h"
 #include "velox/exec/PlanNodeStats.h"
 
 #include "utils/ConfigExtractor.h"
@@ -34,7 +34,7 @@ namespace gluten {
 
 namespace {
 // Velox configs
-const std::string kHiveConnectorId = "test-hive";
+const std::string kOdpsConnectorId = "test-odps";
 
 // memory
 const std::string kSpillStrategy = "spark.gluten.sql.columnar.backend.velox.spillStrategy";
@@ -78,7 +78,7 @@ const std::string kSkippedStrides = "skippedStrides";
 const std::string kProcessedStrides = "processedStrides";
 
 // others
-const std::string kHiveDefaultPartition = "__HIVE_DEFAULT_PARTITION__";
+const std::string kOdpsDefaultPartition = "__ODPS_DEFAULT_PARTITION__";
 
 } // namespace
 
@@ -97,7 +97,7 @@ WholeStageResultIterator::WholeStageResultIterator(
 
 std::shared_ptr<velox::core::QueryCtx> WholeStageResultIterator::createNewVeloxQueryCtx() {
   std::unordered_map<std::string, std::shared_ptr<velox::Config>> connectorConfigs;
-  connectorConfigs[kHiveConnectorId] = createConnectorConfig();
+  connectorConfigs[kOdpsConnectorId] = createConnectorConfig();
   std::shared_ptr<velox::core::QueryCtx> ctx = std::make_shared<velox::core::QueryCtx>(
       nullptr,
       facebook::velox::core::QueryConfig{getQueryContextConf()},
@@ -408,9 +408,9 @@ void WholeStageResultIterator::updateHdfsTokens() {
 std::shared_ptr<velox::Config> WholeStageResultIterator::createConnectorConfig() {
   std::unordered_map<std::string, std::string> configs = {};
   // The semantics of reading as lower case is opposite with case-sensitive.
-  configs[velox::connector::hive::HiveConfig::kFileColumnNamesReadAsLowerCase] =
+  configs[velox::connector::odps::OdpsConfig::kFileColumnNamesReadAsLowerCase] =
       getConfigValue(confMap_, kCaseSensitive, "false") == "false" ? "true" : "false";
-  configs[velox::connector::hive::HiveConfig::kArrowBridgeTimestampUnit] = 2;
+  configs[velox::connector::odps::OdpsConfig::kArrowBridgeTimestampUnit] = 2;
 
   return std::make_shared<velox::core::MemConfig>(configs);
 }
@@ -434,14 +434,15 @@ WholeStageResultIteratorFirstStage::WholeStageResultIteratorFirstStage(
     throw std::runtime_error("Invalid scan information.");
   }
 
+  //TODO: support odps scanInfo
   for (const auto& scanInfo : scanInfos) {
     // Get the information for TableScan.
     // Partition index in scan info is not used.
-    const auto& paths = scanInfo->paths;
-    const auto& starts = scanInfo->starts;
-    const auto& lengths = scanInfo->lengths;
-    const auto& format = scanInfo->format;
-    const auto& partitionColumns = scanInfo->partitionColumns;
+    const auto& sessionId = scanInfo->sessionId;
+    const auto& index = scanInfo->index;
+    const auto& projectName = scanInfo->projectName;
+    const auto& schemaName = scanInfo->schemaName;
+    const auto& tableName = scanInfo->tableName;
 
     std::vector<std::shared_ptr<velox::connector::ConnectorSplit>> connectorSplits;
     connectorSplits.reserve(paths.size());
@@ -449,8 +450,8 @@ WholeStageResultIteratorFirstStage::WholeStageResultIteratorFirstStage(
       auto partitionColumn = partitionColumns[idx];
       std::unordered_map<std::string, std::optional<std::string>> partitionKeys;
       constructPartitionColumns(partitionKeys, partitionColumn);
-      auto split = std::make_shared<velox::connector::hive::HiveConnectorSplit>(
-          kHiveConnectorId, paths[idx], format, starts[idx], lengths[idx], partitionKeys);
+      auto split = std::make_shared<velox::connector::odps::OdpsConnectorSplit>(
+          kOdpsConnectorId, projectName, tableName, schemaName, sessionId, index);
       connectorSplits.emplace_back(split);
     }
 
@@ -505,7 +506,7 @@ void WholeStageResultIteratorFirstStage::constructPartitionColumns(
     if (!folly::to<bool>(getConfigValue(confMap_, kCaseSensitive, "false"))) {
       folly::toLowerAscii(key);
     }
-    if (value == kHiveDefaultPartition) {
+    if (value == kOdpsDefaultPartition) {
       partitionKeys[key] = std::nullopt;
     } else {
       partitionKeys[key] = value;

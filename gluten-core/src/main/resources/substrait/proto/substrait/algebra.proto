@@ -89,6 +89,12 @@ message ReadRel {
     google.protobuf.Any detail = 1;
   }
 
+  // have two place, one in gluten, one in velox
+  message OdpsScanSplit {
+    string sessionId = 1;
+    int32 index = 2;
+  }
+
   // Represents a list of files in input of a scan operation
   message LocalFiles {
     repeated FileOrFiles items = 1;

@@ -37,6 +37,10 @@ install_centos_7() {
         bison \
         java-1.8.0-openjdk java-1.8.0-openjdk-devel
 
+
+    if [ -f /usr/bin/cmake ] || [ -L /usr/bin/cmake ]; then
+        sudo rm /usr/bin/cmake
+    fi
     sudo ln -s /usr/bin/cmake3 /usr/bin/cmake
 
     # git>2.7.4

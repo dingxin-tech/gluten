@@ -118,6 +118,7 @@ void VeloxPlanConverter::setInputPlanNode(const ::substrait::JoinRel& sjoin) {
 }
 
 void VeloxPlanConverter::setInputPlanNode(const ::substrait::ReadRel& sread) {
+  // odps stream index is always -1 [dingxin]
   int32_t iterIdx = substraitVeloxPlanConverter_.getStreamIndex(sread);
   if (iterIdx == -1) {
     return;
