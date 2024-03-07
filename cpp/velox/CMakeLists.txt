@@ -77,15 +77,8 @@ endfunction()
 macro(ADD_VELOX_OBJECTS)
   add_library(velox_objects OBJECT IMPORTED GLOBAL)
   set_property(TARGET velox_objects PROPERTY IMPORTED_OBJECTS
-          "${VELOX_COMPONENTS_PATH}/connectors/hive/CMakeFiles/velox_hive_connector.dir/FileHandle.cpp.o"
-          "${VELOX_COMPONENTS_PATH}/connectors/hive/CMakeFiles/velox_hive_connector.dir/HiveConfig.cpp.o"
-          "${VELOX_COMPONENTS_PATH}/connectors/hive/CMakeFiles/velox_hive_connector.dir/HiveConnector.cpp.o"
-          "${VELOX_COMPONENTS_PATH}/connectors/hive/CMakeFiles/velox_hive_connector.dir/HiveDataSink.cpp.o"
-          "${VELOX_COMPONENTS_PATH}/connectors/hive/CMakeFiles/velox_hive_connector.dir/HiveDataSource.cpp.o"
-          "${VELOX_COMPONENTS_PATH}/connectors/hive/CMakeFiles/velox_hive_connector.dir/HivePartitionUtil.cpp.o"
-          "${VELOX_COMPONENTS_PATH}/connectors/hive/CMakeFiles/velox_hive_connector.dir/PartitionIdGenerator.cpp.o"
-          "${VELOX_COMPONENTS_PATH}/connectors/hive/CMakeFiles/velox_hive_connector.dir/SplitReader.cpp.o"
-          "${VELOX_COMPONENTS_PATH}/connectors/hive/CMakeFiles/velox_hive_connector.dir/TableHandle.cpp.o"
+          "${VELOX_COMPONENTS_PATH}/connectors/odps/CMakeFiles/velox_odps_connector.dir/OdpsConnector.cpp.o"
+          "${VELOX_COMPONENTS_PATH}/connectors/odps/CMakeFiles/velox_odps_connector.dir/OdpsDatasource.cpp.o"
           )
   target_link_libraries(velox PUBLIC velox_objects)
 endmacro()
@@ -139,16 +132,7 @@ macro(ADD_VELOX_DEPENDENCIES)
   add_velox_dependency(vector::arrow::bridge "${VELOX_COMPONENTS_PATH}/vector/arrow/libvelox_arrow_bridge.a")
   add_velox_dependency(row "${VELOX_COMPONENTS_PATH}/row/libvelox_row_fast.a")
   add_velox_dependency(connector "${VELOX_COMPONENTS_PATH}/connectors/libvelox_connector.a")
-  add_velox_dependency(connector::hive_parition "${VELOX_COMPONENTS_PATH}/connectors/hive/libvelox_hive_partition_function.a")
-  if(ENABLE_HDFS)
-    add_velox_dependency(connector::hive::hdfs "${VELOX_COMPONENTS_PATH}/connectors/hive/storage_adapters/hdfs/libvelox_hdfs.a")
-  endif()
-  if(ENABLE_GCS)
-    add_velox_dependency(connector::hive::gcs "${VELOX_COMPONENTS_PATH}/connectors/hive/storage_adapters/gcs/libvelox_gcs.a")
-  endif()
-  if(ENABLE_S3)
-    add_velox_dependency(connector::hive::s3fs "${VELOX_COMPONENTS_PATH}/connectors/hive/storage_adapters/s3fs/libvelox_s3fs.a")
-  endif()
+
   add_velox_dependency(dwio::dwrf::writer "${VELOX_COMPONENTS_PATH}/dwio/dwrf/writer/libvelox_dwio_dwrf_writer.a")
   add_velox_dependency(dwio::dwrf::reader "${VELOX_COMPONENTS_PATH}/dwio/dwrf/reader/libvelox_dwio_dwrf_reader.a")
   add_velox_dependency(dwio::dwrf::utils "${VELOX_COMPONENTS_PATH}/dwio/dwrf/utils/libvelox_dwio_dwrf_utils.a")
