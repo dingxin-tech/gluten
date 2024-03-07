@@ -19,7 +19,7 @@
 
 #include "SubstraitToVeloxExpr.h"
 #include "TypeUtils.h"
-#include "velox/connectors/odps/HiveConnector.h"
+#include "velox/connectors/odps/OdpsConnector.h"
 #include "velox/connectors/odps/TableHandle.h"
 #include "velox/core/PlanNode.h"
 #include "velox/dwio/common/Options.h"
@@ -217,7 +217,7 @@ class SubstraitToVeloxPlanConverter {
 
 
   /// Connect all remaining functions with 'and' relation
-  /// for the use of remaingFilter in Hive Connector.
+  /// for the use of remaingFilter in Odps Connector.
   core::TypedExprPtr connectWithAnd(
       std::vector<std::string> inputNameList,
       std::vector<TypePtr> inputTypeList,
