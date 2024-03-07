@@ -16,9 +16,6 @@
  */
 package io.glutenproject.substrait.rel;
 
-import java.util.Collections;
-import java.util.List;
-
 import com.aliyun.odps.table.TableIdentifier;
 import com.aliyun.odps.table.read.split.InputSplit;
 import com.aliyun.odps.table.read.split.impl.IndexedInputSplit;
@@ -29,6 +26,9 @@ import io.substrait.proto.ReadRel.ExtensionTable.Builder;
 import io.substrait.proto.ReadRel.OdpsScanSplit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Collections;
+import java.util.List;
 
 /** @author dingxin (zhangdingxin.zdx@alibaba-inc.com) */
 public class OdpsScanNode implements SplitInfo {
@@ -64,7 +64,8 @@ public class OdpsScanNode implements SplitInfo {
             .setProject(projectName)
             .setSchema(schemaName)
             .setTable(tableName)
-            .setIndex(index).build();
+            .setIndex(index)
+            .build();
     Builder builder = ExtensionTable.newBuilder();
     builder.setDetail(Any.pack(odpsScanSplit));
     return builder.build();

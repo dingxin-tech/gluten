@@ -35,7 +35,6 @@ import org.apache.spark.sql.catalyst.expressions.{Attribute, SortOrder}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.metric.SQLMetric
-import org.apache.spark.sql.hive.HiveTableScanExecTransformer
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 import com.google.common.collect.Lists
