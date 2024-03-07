@@ -98,12 +98,11 @@ do
 done
 
 if [ "$SKIP_BUILD_EP" != "ON" ]; then
-    nvs="$("$GLUTEN_DIR/dev/vcpkg/setup-build-depends.sh")"
-    eval "$envs"
+    envs="$("$GLUTEN_DIR/dev/vcpkg/setup-build-depends.sh")"
+    echo "remember to run: source $envs, source /opt/rh/devtoolset-9/enable[centos7]"
 fi
 
 if [ "$ENABLE_VCPKG" = "ON" ]; then
-    source /opt/rh/devtoolset-9/enable
     # vcpkg will install static depends and init build environment
     envs="$("$GLUTEN_DIR/dev/vcpkg/init.sh")"
     eval "$envs"
