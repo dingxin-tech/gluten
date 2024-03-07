@@ -45,7 +45,7 @@
 #include "velox/common/memory/MmapAllocator.h"
 #include "velox/connectors/odps/OdpsConfig.hpp"
 #include "velox/connectors/odps/OdpsConnector.h"
-#include "velox/connectors/odps/OdpsDataSource.h"
+#include "velox/connectors/odps/OdpsDatasource.h"
 #include "velox/dwio/dwrf/reader/DwrfReader.h"
 #include "velox/dwio/parquet/RegisterParquetReader.h"
 #include "velox/serializers/PrestoSerializer.h"
