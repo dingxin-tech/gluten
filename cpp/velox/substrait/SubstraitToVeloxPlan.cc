@@ -23,6 +23,7 @@
 #include "utils/ConfigExtractor.h"
 
 #include "config/GlutenConfig.h"
+#include "substrait/algebra.pb.h"
 
 namespace gluten {
 namespace {

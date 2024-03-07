@@ -442,15 +442,11 @@ WholeStageResultIteratorFirstStage::WholeStageResultIteratorFirstStage(
     const auto& tableName = scanInfo->tableName;
 
     std::vector<std::shared_ptr<velox::connector::ConnectorSplit>> connectorSplits;
-    connectorSplits.reserve(paths.size());
-    for (int idx = 0; idx < paths.size(); idx++) {
-      auto partitionColumn = partitionColumns[idx];
-      std::unordered_map<std::string, std::optional<std::string>> partitionKeys;
-      constructPartitionColumns(partitionKeys, partitionColumn);
-      auto split = std::make_shared<velox::connector::odps::OdpsConnectorSplit>(
+    connectorSplits.reserve(1);
+
+    auto split = std::make_shared<velox::connector::odps::OdpsConnectorSplit>(
           kOdpsConnectorId, projectName, tableName, schemaName, sessionId, index);
-      connectorSplits.emplace_back(split);
-    }
+    connectorSplits.emplace_back(split);
 
     std::vector<velox::exec::Split> scanSplits;
     scanSplits.reserve(connectorSplits.size());
