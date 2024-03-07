@@ -481,9 +481,9 @@ object GlutenConfig {
 
     val nativeConfMap = new util.HashMap[String, String]()
     // extract conf from SparkConf send to velox
-    nativeConfMap.put("access_id", conf.get("spark.hadoop.odps.access.id"));
-    nativeConfMap.put("access_key", conf.get("spark.hadoop.odps.access.key"));
-    nativeConfMap.put("endpoint", conf.get("spark.hadoop.odps.end.point"));
+    nativeConfMap.put("access_id", conf("spark.hadoop.odps.access.id"))
+    nativeConfMap.put("access_key", conf("spark.hadoop.odps.access.key"))
+    nativeConfMap.put("endpoint", conf("spark.hadoop.odps.end.point"))
     // return
     nativeConfMap
   }

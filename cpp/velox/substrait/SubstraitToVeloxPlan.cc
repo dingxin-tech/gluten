@@ -789,8 +789,8 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
   if (readRel.has_extension_table()) {
     const auto& extensionTable = readRel.extension_table();
 
-    if (extensionTable.detail().Is<OdpsScanSplit>()) {
-      OdpsScanSplit odpsScanSplit;
+    if (extensionTable.detail().Is<::substrait::ReadRel_OdpsScanSplit>()) {
+      ::substrait::ReadRel_OdpsScanSplit odpsScanSplit;
       if (extensionTable.detail().UnpackTo(&odpsScanSplit)) {
         splitInfo->projectName = odpsScanSplit.project();
         splitInfo->schemaName = odpsScanSplit.schema();
