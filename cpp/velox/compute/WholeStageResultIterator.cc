@@ -18,7 +18,7 @@
 #include "VeloxBackend.h"
 #include "VeloxRuntime.h"
 #include "config/GlutenConfig.h"
-#include "velox/connectors/odps/OdpsConfig.h"
+#include "velox/connectors/odps/OdpsConfig.hpp"
 #include "velox/connectors/odps/OdpsConnectorSplit.h"
 #include "velox/exec/PlanNodeStats.h"
 

@@ -20,7 +20,7 @@
 #include "SubstraitToVeloxExpr.h"
 #include "TypeUtils.h"
 #include "velox/connectors/odps/OdpsConnector.h"
-#include "velox/connectors/odps/TableHandle.h"
+#include "velox/connectors/odps/TableHandle.hpp"
 #include "velox/core/PlanNode.h"
 #include "velox/dwio/common/Options.h"
 #include <string>

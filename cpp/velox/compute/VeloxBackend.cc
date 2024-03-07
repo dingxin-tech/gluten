@@ -43,7 +43,7 @@
 #include "velox/common/caching/SsdCache.h"
 #include "velox/common/file/FileSystems.h"
 #include "velox/common/memory/MmapAllocator.h"
-#include "velox/connectors/odps/OdpsConfig.h"
+#include "velox/connectors/odps/OdpsConfig.hpp"
 #include "velox/connectors/odps/OdpsConnector.h"
 #include "velox/connectors/odps/OdpsDataSource.h"
 #include "velox/dwio/dwrf/reader/DwrfReader.h"
