@@ -77,7 +77,7 @@ class IteratorApiImpl extends IteratorApi with Logging {
           fileFormat,
           preferredLocations.toList.asJava)
       case f: OdpsScanPartition =>
-        new OdpsScanNode(f.inputSplit)
+        new OdpsScanNode(f.scan.getTableIdentifier, f.inputSplit)
       case _ =>
         throw new UnsupportedOperationException(
           s"Unsupported input partition type." + partition.getClass.getSimpleName)

@@ -16,6 +16,10 @@
  */
 package io.glutenproject.substrait.rel;
 
+import java.util.Collections;
+import java.util.List;
+
+import com.aliyun.odps.table.TableIdentifier;
 import com.aliyun.odps.table.read.split.InputSplit;
 import com.aliyun.odps.table.read.split.impl.IndexedInputSplit;
 import com.google.protobuf.Any;
@@ -26,16 +30,20 @@ import io.substrait.proto.ReadRel.OdpsScanSplit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collections;
-import java.util.List;
-
 /** @author dingxin (zhangdingxin.zdx@alibaba-inc.com) */
 public class OdpsScanNode implements SplitInfo {
   private static final Logger LOG = LoggerFactory.getLogger(OdpsScanNode.class);
+  private String projectName;
+  private String schemaName;
+  private String tableName;
   private String sessionId;
   private Integer index;
 
-  public OdpsScanNode(InputSplit inputSplit) {
+  public OdpsScanNode(TableIdentifier identifier, InputSplit inputSplit) {
+    projectName = identifier.getProject();
+    schemaName = identifier.getSchema();
+    tableName = identifier.getTable();
+
     sessionId = inputSplit.getSessionId();
     if (inputSplit instanceof IndexedInputSplit) {
       index = ((IndexedInputSplit) inputSplit).getSplitIndex();
@@ -51,6 +59,14 @@ public class OdpsScanNode implements SplitInfo {
   @Override
   public MessageOrBuilder toProtobuf() {
     OdpsScanSplit odpsScanSplit =
-        OdpsScanSplit.newBuilder().setSessionId(sessionId).setIndex(index).build();
+        OdpsScanSplit.newBuilder()
+            .setSessionId(sessionId)
+            .setProject(projectName)
+            .setSchema(schemaName)
+            .setTable(tableName)
+            .setIndex(index).build();
     Builder builder = ExtensionTable.newBuilder();
-    builder.setDetail(Any.pack(odpsScanSpli
+    builder.setDetail(Any.pack(odpsScanSplit));
+    return builder.build();
+  }
+}

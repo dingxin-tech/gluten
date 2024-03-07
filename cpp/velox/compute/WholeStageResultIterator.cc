@@ -408,9 +408,6 @@ void WholeStageResultIterator::updateHdfsTokens() {
 std::shared_ptr<velox::Config> WholeStageResultIterator::createConnectorConfig() {
   std::unordered_map<std::string, std::string> configs = {};
   // The semantics of reading as lower case is opposite with case-sensitive.
-  configs[velox::connector::odps::OdpsConfig::kFileColumnNamesReadAsLowerCase] =
-      getConfigValue(confMap_, kCaseSensitive, "false") == "false" ? "true" : "false";
-  configs[velox::connector::odps::OdpsConfig::kArrowBridgeTimestampUnit] = 2;
 
   return std::make_shared<velox::core::MemConfig>(configs);
 }

@@ -16,14 +16,16 @@
  */
 package io.glutenproject
 
-import com.google.common.collect.ImmutableList
-import org.apache.hadoop.security.UserGroupInformation
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.util.ByteUnit
 import org.apache.spark.sql.internal.SQLConf
 
+import com.google.common.collect.ImmutableList
+import org.apache.hadoop.security.UserGroupInformation
+
 import java.util
 import java.util.Locale
+
 import scala.collection.JavaConverters.collectionAsScalaIterableConverter
 
 case class GlutenNumaBindingInfo(

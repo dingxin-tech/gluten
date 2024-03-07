@@ -23,7 +23,6 @@
 #include "velox/connectors/odps/TableHandle.hpp"
 #include "velox/core/PlanNode.h"
 #include "velox/dwio/common/Options.h"
-#include <string>
 
 namespace gluten {
 
@@ -31,11 +30,11 @@ struct SplitInfo {
   /// Whether the split comes from arrow array stream node.
   bool isStream = false;
 
-  string projectName;
-  string schemaName;
-  string tableName;
+  std::string projectName;
+  std::string schemaName;
+  std::string tableName;
 
-  string sessionId;
+  std::string sessionId;
 
   int index;
 };
@@ -185,16 +184,6 @@ class SubstraitToVeloxPlanConverter {
       const ::substrait::Expression_ScalarFunction& scalarFunction,
       const std::string& filterName,
       uint32_t& fieldIdx);
-
-  /// Returns whether a NOT function can be pushed down.
-  bool canPushdownNot(
-      const ::substrait::Expression_ScalarFunction& scalarFunction,
-      std::vector<RangeRecorder>& rangeRecorders);
-
-  /// Returns whether a OR function can be pushed down.
-  bool canPushdownOr(
-      const ::substrait::Expression_ScalarFunction& scalarFunction,
-      std::vector<RangeRecorder>& rangeRecorders);
 
   /// Returns whether a SingularOrList can be pushed down.
   static bool canPushdownSingularOrList(

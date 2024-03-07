@@ -91,8 +91,11 @@ message ReadRel {
 
   // have two place, one in gluten, one in velox
   message OdpsScanSplit {
-    string sessionId = 1;
-    int32 index = 2;
+    string project = 1;
+    string schema = 2;
+    string table = 3;
+    string sessionId = 4;
+    int32 index = 5;
   }
 
   // Represents a list of files in input of a scan operation

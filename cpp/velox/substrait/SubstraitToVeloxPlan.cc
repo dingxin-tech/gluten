@@ -784,10 +784,24 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
   }
 
   // Parse local files and construct split info.
-  // TODO: construct odps split info here.
-  if(readRel.has_extension_table()) {
+  // construct odps split info here.
+  if (readRel.has_extension_table()) {
     const auto& extensionTable = readRel.extension_table();
 
+    if (extensionTable.detail().Is<OdpsScanSplit>()) {
+      OdpsScanSplit odpsScanSplit;
+      if (extensionTable.detail().UnpackTo(&odpsScanSplit)) {
+        splitInfo->projectName = odpsScanSplit.project();
+        splitInfo->schemaName = odpsScanSplit.schema();
+        splitInfo->tableName = odpsScanSplit.table();
+        splitInfo->sessionId = odpsScanSplit.sessionid();
+        splitInfo->index = odpsScanSplit.index();
+      } else {
+        std::cerr << "Error unpacking ExtensionTable detail as OdpsScanSplit." << std::endl;
+      }
+    } else {
+      std::cerr << "ExtensionTable detail is not of type OdpsScanSplit." << std::endl;
+    }
   }
 
   // Do not hard-code connector ID and allow for connectors other than Odps.
@@ -1123,166 +1137,6 @@ bool SubstraitToVeloxPlanConverter::canPushdownCommonFunction(
     canPushdown = true;
   }
   return canPushdown;
-}
-
-bool SubstraitToVeloxPlanConverter::canPushdownNot(
-    const ::substrait::Expression_ScalarFunction& scalarFunction,
-    std::vector<RangeRecorder>& rangeRecorders) {
-  VELOX_CHECK(scalarFunction.arguments().size() == 1, "Only one arg is expected for Not.");
-  const auto& notArg = scalarFunction.arguments()[0];
-  if (!notArg.value().has_scalar_function()) {
-    // Not for a Boolean Literal or Or List is not supported curretly.
-    // It can be pushed down with an AlwaysTrue or AlwaysFalse Range.
-    return false;
-  }
-
-  auto argFunction =
-      SubstraitParser::findFunctionSpec(functionMap_, notArg.value().scalar_function().function_reference());
-  auto functionName = SubstraitParser::getNameBeforeDelimiter(argFunction);
-
-  static const std::unordered_set<std::string> supportedNotFunctions = {sGte, sGt, sLte, sLt, sEqual};
-
-  uint32_t fieldIdx;
-  bool isFieldOrWithLiteral = fieldOrWithLiteral(notArg.value().scalar_function().arguments(), fieldIdx);
-
-  if (supportedNotFunctions.find(functionName) != supportedNotFunctions.end() && isFieldOrWithLiteral &&
-      rangeRecorders.at(fieldIdx).setCertainRangeForFunction(functionName, true /*reverse*/)) {
-    return true;
-  }
-  return false;
-}
-
-bool SubstraitToVeloxPlanConverter::canPushdownOr(
-    const ::substrait::Expression_ScalarFunction& scalarFunction,
-    std::vector<RangeRecorder>& rangeRecorders) {
-  // OR Conditon whose children functions are on different columns is not
-  // supported to be pushed down.
-  if (!childrenFunctionsOnSameField(scalarFunction)) {
-    return false;
-  }
-
-  static const std::unordered_set<std::string> supportedOrFunctions = {sIsNotNull, sGte, sGt, sLte, sLt, sEqual};
-
-  for (const auto& arg : scalarFunction.arguments()) {
-    if (arg.value().has_scalar_function()) {
-      auto nameSpec =
-          SubstraitParser::findFunctionSpec(functionMap_, arg.value().scalar_function().function_reference());
-      auto functionName = SubstraitParser::getNameBeforeDelimiter(nameSpec);
-
-      uint32_t fieldIdx;
-      bool isFieldOrWithLiteral = fieldOrWithLiteral(arg.value().scalar_function().arguments(), fieldIdx);
-      if (supportedOrFunctions.find(functionName) == supportedOrFunctions.end() || !isFieldOrWithLiteral ||
-          !rangeRecorders.at(fieldIdx).setCertainRangeForFunction(
-              functionName, false /*reverse*/, true /*forOrRelation*/)) {
-        // The arg should be field or field with literal.
-        return false;
-      }
-    } else if (arg.value().has_singular_or_list()) {
-      const auto& singularOrList = arg.value().singular_or_list();
-      if (!canPushdownSingularOrList(singularOrList, true)) {
-        return false;
-      }
-      uint32_t fieldIdx = getColumnIndexFromSingularOrList(singularOrList);
-      // Disable IN pushdown for int-like types.
-      if (!rangeRecorders.at(fieldIdx).setInRange(true /*forOrRelation*/)) {
-        return false;
-      }
-    } else {
-      // Or relation betweeen other expressions is not supported to be pushded
-      // down currently.
-      return false;
-    }
-  }
-  return true;
-}
-
-bool SubstraitToVeloxPlanConverter::RangeRecorder::setCertainRangeForFunction(
-    const std::string& functionName,
-    bool reverse,
-    bool forOrRelation) {
-  if (functionName == sLt || functionName == sLte) {
-    if (reverse) {
-      return setLeftBound(forOrRelation);
-    } else {
-      return setRightBound(forOrRelation);
-    }
-  } else if (functionName == sGt || functionName == sGte) {
-    if (reverse) {
-      return setRightBound(forOrRelation);
-    } else {
-      return setLeftBound(forOrRelation);
-    }
-  } else if (functionName == sEqual) {
-    if (reverse) {
-      // Not equal means lt or gt.
-      return setMultiRange();
-    } else {
-      return setLeftBound(forOrRelation) && setRightBound(forOrRelation);
-    }
-  } else if (functionName == sOr) {
-    if (reverse) {
-      // Not supported.
-      return false;
-    } else {
-      return setMultiRange();
-    }
-  } else if (functionName == sIsNotNull) {
-    if (reverse) {
-      // Not supported.
-      return false;
-    } else {
-      // Is not null can always coexist with the other range.
-      return true;
-    }
-  } else {
-    return false;
-  }
-}
-
-void SubstraitToVeloxPlanConverter::setColumnFilterInfo(
-    const std::string& filterName,
-    std::optional<variant> literalVariant,
-    FilterInfo& columnFilterInfo,
-    bool reverse) {
-  if (filterName == sIsNotNull) {
-    if (reverse) {
-      VELOX_NYI("Reverse not supported for filter name '{}'", filterName);
-    }
-    columnFilterInfo.forbidsNull();
-  } else if (filterName == sGte) {
-    if (reverse) {
-      columnFilterInfo.setUpper(literalVariant, true);
-    } else {
-      columnFilterInfo.setLower(literalVariant, false);
-    }
-  } else if (filterName == sGt) {
-    if (reverse) {
-      columnFilterInfo.setUpper(literalVariant, false);
-    } else {
-      columnFilterInfo.setLower(literalVariant, true);
-    }
-  } else if (filterName == sLte) {
-    if (reverse) {
-      columnFilterInfo.setLower(literalVariant, true);
-    } else {
-      columnFilterInfo.setUpper(literalVariant, false);
-    }
-  } else if (filterName == sLt) {
-    if (reverse) {
-      columnFilterInfo.setLower(literalVariant, false);
-    } else {
-      columnFilterInfo.setUpper(literalVariant, true);
-    }
-  } else if (filterName == sEqual) {
-    if (reverse) {
-      columnFilterInfo.setNotValue(literalVariant);
-    } else {
-      columnFilterInfo.setLower(literalVariant, false);
-      columnFilterInfo.setUpper(literalVariant, false);
-    }
-  } else {
-    VELOX_NYI("setColumnFilterInfo not supported for filter name '{}'", filterName);
-  }
 }
 
 template <TypeKind KIND, typename FilterType>
