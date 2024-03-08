@@ -1011,7 +1011,7 @@ object GlutenConfig {
       .internal()
       .doc("The split preload per task")
       .intConf
-      .createWithDefault(2)
+      .createWithDefault(0)
 
   val COLUMNAR_VELOX_GLOG_VERBOSE_LEVEL =
     buildStaticConf("spark.gluten.sql.columnar.backend.velox.glogVerboseLevel")
@@ -1087,7 +1087,7 @@ object GlutenConfig {
       .checkValue(
         logLevel => Set("TRACE", "DEBUG", "INFO", "WARN", "ERROR").contains(logLevel),
         "Valid values are 'trace', 'debug', 'info', 'warn' and 'error'.")
-      .createWithDefault("DEBUG")
+      .createWithDefault("INFO")
 
   val SUBSTRAIT_PLAN_LOG_LEVEL =
     buildConf("spark.gluten.sql.substrait.plan.logLevel")
@@ -1097,7 +1097,7 @@ object GlutenConfig {
       .checkValue(
         logLevel => Set("TRACE", "DEBUG", "INFO", "WARN", "ERROR").contains(logLevel),
         "Valid values are 'trace', 'debug', 'info', 'warn' and 'error'.")
-      .createWithDefault("DEBUG")
+      .createWithDefault("INFO")
 
   val VALIDATION_LOG_LEVEL =
     buildConf("spark.gluten.sql.validation.logLevel")
@@ -1113,7 +1113,7 @@ object GlutenConfig {
     buildConf("spark.gluten.sql.validation.printStackOnFailure")
       .internal()
       .booleanConf
-      .createWithDefault(false)
+      .createWithDefault(true)
 
   val SOFT_AFFINITY_LOG_LEVEL =
     buildConf("spark.gluten.soft-affinity.logLevel")
@@ -1123,13 +1123,13 @@ object GlutenConfig {
       .checkValue(
         logLevel => Set("TRACE", "DEBUG", "INFO", "WARN", "ERROR").contains(logLevel),
         "Valid values are 'trace', 'debug', 'info', 'warn' and 'error'.")
-      .createWithDefault("DEBUG")
+      .createWithDefault("INFO")
 
   val DEBUG_LEVEL_ENABLED =
     buildConf(GLUTEN_DEBUG_MODE)
       .internal()
       .booleanConf
-      .createWithDefault(false)
+      .createWithDefault(true)
 
   val BENCHMARK_TASK_STAGEID =
     buildConf("spark.gluten.sql.benchmark_task.stageId")
