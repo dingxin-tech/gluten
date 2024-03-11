@@ -404,14 +404,21 @@ JNIEXPORT jboolean JNICALL Java_io_glutenproject_vectorized_ColumnarBatchOutIter
     jobject wrapper,
     jlong iterHandle) {
   JNI_METHOD_START
-  auto ctx = gluten::getRuntime(env, wrapper);
-
-  auto iter = ctx->objectStore()->retrieve<ResultIterator>(iterHandle);
-  if (iter == nullptr) {
-    std::string errorMessage = "failed to get batch iterator";
-    throw gluten::GlutenException(errorMessage);
+  try {
+    auto ctx = gluten::getRuntime(env, wrapper);
+    auto iter = ctx->objectStore()->retrieve<ResultIterator>(iterHandle);
+    if (iter == nullptr) {
+      std::string errorMessage = "failed to get batch iterator";
+      throw gluten::GlutenException(errorMessage);
+    }
+    return iter->hasNext();
+  } catch (const std::exception& e) {
+    env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
+    return JNI_FALSE;
+  } catch (...) {
+    env->ThrowNew(env->FindClass("java/lang/RuntimeException"), "Unknown error occurred in C++ code.");
+    return JNI_FALSE;
   }
-  return iter->hasNext();
   JNI_METHOD_END(false)
 }
 
