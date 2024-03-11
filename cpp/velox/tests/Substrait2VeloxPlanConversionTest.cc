@@ -28,6 +28,7 @@
 #include "velox/exec/tests/utils/PlanBuilder.h"
 #include "velox/exec/tests/utils/TempDirectoryPath.h"
 #include "velox/type/Type.h"
+#include "velox/connectors/odps/OdpsConnectorSplit.h"
 
 #include "FilePathGenerator.h"
 
@@ -48,18 +49,17 @@ class Substrait2VeloxPlanConversionTest : public exec::test::HiveConnectorTestBa
     EXPECT_EQ(1, leafPlanNodeIds.size());
     const auto& splitInfo = splitInfos.at(*leafPlanNodeIds.begin());
 
-    auto scanInfo = std::make_shared<gluten::SplitInfo>();
     std::vector<std::shared_ptr<facebook::velox::connector::ConnectorSplit>> splits;
     splits.reserve(1);
 
     auto odpsScanSplit = std::make_shared<OdpsConnectorSplit>(
         "test-odps",
-        scanInfo->projectName,
-        scanInfo->tableName,
-        scanInfo->schemaName,
-        scanInfo->sessionId,
-        scanInfo->index);
-    splits.emplace_back(split);
+        splitInfo->projectName,
+        splitInfo->tableName,
+        splitInfo->schemaName,
+        splitInfo->sessionId,
+        splitInfo->index);
+    splits.emplace_back(odpsScanSplit);
     return splits;
   }
 
