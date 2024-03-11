@@ -33,7 +33,7 @@
 
 using namespace facebook::velox;
 using namespace facebook::velox::test;
-using namespace facebook::velox::connector::hive;
+using namespace facebook::velox::connector::odps;
 using namespace facebook::velox::exec;
 
 namespace gluten {
@@ -48,25 +48,18 @@ class Substrait2VeloxPlanConversionTest : public exec::test::HiveConnectorTestBa
     EXPECT_EQ(1, leafPlanNodeIds.size());
     const auto& splitInfo = splitInfos.at(*leafPlanNodeIds.begin());
 
-//    const auto& paths = splitInfo->paths;
-//    const auto& starts = splitInfo->starts;
-//    const auto& lengths = splitInfo->lengths;
-//    const auto fileFormat = splitInfo->format;
-
+    auto scanInfo = std::make_shared<gluten::SplitInfo>();
     std::vector<std::shared_ptr<facebook::velox::connector::ConnectorSplit>> splits;
-//    splits.reserve(paths.size());
-//
-//    for (int i = 0; i < paths.size(); i++) {
-//      auto path = fmt::format("{}{}", tmpDir_->path, paths[i]);
-//      auto start = starts[i];
-//      auto length = lengths[i];
-//      auto split = facebook::velox::exec::test::HiveConnectorSplitBuilder(path)
-//                       .fileFormat(fileFormat)
-//                       .start(start)
-//                       .length(length)
-//                       .build();
-//      splits.emplace_back(split);
-//    }
+    splits.reserve(1);
+
+    auto odpsScanSplit = std::make_shared<OdpsConnectorSplit>(
+        "test-odps",
+        scanInfo->projectName,
+        scanInfo->tableName,
+        scanInfo->schemaName,
+        scanInfo->sessionId,
+        scanInfo->index);
+    splits.emplace_back(split);
     return splits;
   }
 
