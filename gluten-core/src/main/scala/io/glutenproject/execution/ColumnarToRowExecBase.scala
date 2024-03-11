@@ -18,7 +18,6 @@ package io.glutenproject.execution
 
 import io.glutenproject.backendsapi.BackendsApiManager
 import io.glutenproject.extension.GlutenPlan
-
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
@@ -47,6 +46,7 @@ abstract class ColumnarToRowExecBase(child: SparkPlan)
   def doExecuteInternal(): RDD[InternalRow]
 
   override def doExecute(): RDD[InternalRow] = {
+    logInfo(s"Executing GlutenPlan(ColumnarToRowExec) on $nodeName, which input is " + child.toJSON)
     doExecuteInternal()
   }
 }
