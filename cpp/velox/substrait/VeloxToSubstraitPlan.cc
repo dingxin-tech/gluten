@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#include <iostream>
 #include "VeloxToSubstraitPlan.h"
 
 namespace gluten {
@@ -86,6 +86,7 @@ namespace {
   for (const auto& name : plan->outputType()->names()) {
     rootRel->add_names(name);
   }
+  std::cout << substraitPlan->DebugString() << std::endl;
 
   return *substraitPlan;
 }
