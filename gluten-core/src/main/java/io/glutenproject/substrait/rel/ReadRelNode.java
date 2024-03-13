@@ -23,6 +23,7 @@ import io.glutenproject.substrait.type.TypeNode;
 
 import io.substrait.proto.NamedStruct;
 import io.substrait.proto.ReadRel;
+import io.substrait.proto.ReadRel.ExtensionTable;
 import io.substrait.proto.Rel;
 import io.substrait.proto.RelCommon;
 import io.substrait.proto.Type;
@@ -143,6 +144,8 @@ public class ReadRelNode implements RelNode, Serializable {
         readBuilder.setLocalFiles(((LocalFilesNode) currentSplitInfo).toProtobuf());
       } else if (currentSplitInfo instanceof ExtensionTableNode) {
         readBuilder.setExtensionTable(((ExtensionTableNode) currentSplitInfo).toProtobuf());
+      } else if (currentSplitInfo instanceof OdpsScanNode) {
+        readBuilder.setExtensionTable((ExtensionTable) currentSplitInfo.toProtobuf());
       }
     }
     Rel.Builder builder = Rel.newBuilder();

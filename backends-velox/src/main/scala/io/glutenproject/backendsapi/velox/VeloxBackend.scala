@@ -20,7 +20,7 @@ import io.glutenproject.{GlutenConfig, GlutenPlugin, VELOX_BRANCH, VELOX_REVISIO
 import io.glutenproject.backendsapi._
 import io.glutenproject.expression.WindowFunctionsBuilder
 import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat
-import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat.{DwrfReadFormat, OrcReadFormat, ParquetReadFormat}
+import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat.{DwrfReadFormat, OdpsReadFormat, OrcReadFormat, ParquetReadFormat}
 
 import org.apache.spark.sql.catalyst.expressions.{Alias, CumeDist, DenseRank, Descending, Expression, Literal, NamedExpression, NthValue, PercentRank, Rand, RangeFrame, Rank, RowNumber, SortOrder, SpecialFrameBoundary, SpecifiedWindowFrame}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Count, Sum}
@@ -106,9 +106,10 @@ object BackendSettings extends BackendSettingsApi {
           // scalastyle:on println
         }
         unsupportedDataTypes.isEmpty && validateTypes
+      case OdpsReadFormat => true
       case _ =>
         // scalastyle:off println
-        println(s"Validation failed for ${this.getClass.toString}")
+        println(s"unknown format ${format.getClass.toString}")
         // scalastyle:on println
         true
     }
