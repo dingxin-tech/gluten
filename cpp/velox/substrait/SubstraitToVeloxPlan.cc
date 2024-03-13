@@ -775,6 +775,7 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
     colNameList.reserve(baseSchema.names().size());
     for (const auto& name : baseSchema.names()) {
       std::string fieldName = name;
+      std::out << name << ", ";
       if (asLowerCase) {
         folly::toLowerAscii(fieldName);
       }
@@ -815,6 +816,11 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
   // Get assignments and out names.
   std::vector<std::string> outNames;
   outNames.reserve(colNameList.size());
+
+  for (int idx = 0; idx < colNameList.size(); idx++) {
+    auto outName = SubstraitParser::makeNodeName(planNodeId_, idx);
+    outNames.emplace_back(outName);
+  }
   // odps assignments is no use
   std::unordered_map<std::string, std::shared_ptr<connector::ColumnHandle>> assignments;
 
