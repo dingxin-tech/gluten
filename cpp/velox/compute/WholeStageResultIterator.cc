@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <iostream>
 #include "WholeStageResultIterator.h"
 #include "VeloxBackend.h"
 #include "VeloxRuntime.h"
@@ -425,6 +426,7 @@ WholeStageResultIteratorFirstStage::WholeStageResultIteratorFirstStage(
       scanNodeIds_(scanNodeIds),
       scanInfos_(scanInfos),
       streamIds_(streamIds) {
+  std::cout << "WholeStageResultIteratorFirstStage" << std::endl;
   // Generate splits for all scan nodes.
   splits_.reserve(scanInfos.size());
   if (scanNodeIds.size() != scanInfos.size()) {

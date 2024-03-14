@@ -775,7 +775,6 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
     colNameList.reserve(baseSchema.names().size());
     for (const auto& name : baseSchema.names()) {
       std::string fieldName = name;
-      std::out << name << ", ";
       if (asLowerCase) {
         folly::toLowerAscii(fieldName);
       }

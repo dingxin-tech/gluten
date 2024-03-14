@@ -57,6 +57,7 @@ void VeloxRuntime::getInfoAndIds(
     std::vector<velox::core::PlanNodeId>& scanIds,
     std::vector<velox::core::PlanNodeId>& streamIds) {
   for (const auto& leafPlanNodeId : leafPlanNodeIds) {
+    std::cout << "leafPlanNodeId" << leafPlanNodeId << std::endl;
     auto it = splitInfoMap.find(leafPlanNodeId);
     if (it == splitInfoMap.end()) {
       throw std::runtime_error("Could not find leafPlanNodeId.");
@@ -98,7 +99,7 @@ std::shared_ptr<ResultIterator> VeloxRuntime::createResultIterator(
 
   // Separate the scan ids and stream ids, and get the scan infos.
   getInfoAndIds(veloxPlanConverter.splitInfos(), veloxPlan_->leafPlanNodeIds(), scanInfos, scanIds, streamIds);
-
+  std::cout << "getInfoAndIds: " << scanInfos.size() << std::endl;
   auto* vmm = toVeloxMemoryManager(memoryManager);
   if (scanInfos.size() == 0) {
     // Source node is not required.
