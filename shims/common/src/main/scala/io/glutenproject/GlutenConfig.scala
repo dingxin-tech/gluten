@@ -484,6 +484,7 @@ object GlutenConfig {
     nativeConfMap.put("access_id", conf("spark.hadoop.odps.access.id"))
     nativeConfMap.put("access_key", conf("spark.hadoop.odps.access.key"))
     nativeConfMap.put("endpoint", conf("spark.hadoop.odps.end.point"))
+    nativeConfMap.put("default_project", conf("spark.hadoop.odps.project.name"))
     if (conf.contains("spark.hadoop.odps.tunnel.end.point")) {
       nativeConfMap.put("tunnel_endpoint", conf("spark.hadoop.odps.tunnel.end.point"))
     }
