@@ -98,6 +98,10 @@ class HiveTableScanExecTransformer(
     Seq.empty
   }
 
+  override protected def doValidateInternal(): ValidationResult = {
+    ValidationResult.ok
+  }
+
   override def metricsUpdater(): MetricsUpdater =
     BackendsApiManager.getMetricsApiInstance.genHiveTableScanTransformerMetricsUpdater(metrics)
 

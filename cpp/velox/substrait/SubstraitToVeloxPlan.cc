@@ -1019,6 +1019,7 @@ int32_t SubstraitToVeloxPlanConverter::getStreamIndex(const ::substrait::ReadRel
     // Get the index.
     std::string idxStr = filePath.substr(pos + prefix.size(), filePath.size());
     try {
+      std::out << "[debug] if here will triggered ? then get Stream index >= 0" << std::endl;
       return stoi(idxStr);
     } catch (const std::exception& err) {
       VELOX_FAIL(err.what());
@@ -1030,8 +1031,7 @@ int32_t SubstraitToVeloxPlanConverter::getStreamIndex(const ::substrait::ReadRel
   if (validationMode_) {
     return -1;
   }
-  return 0;
-  //  VELOX_FAIL("Local file is expected.");
+  VELOX_FAIL("Local file is expected.");
 }
 
 void SubstraitToVeloxPlanConverter::extractJoinKeys(

@@ -146,6 +146,8 @@ public class ReadRelNode implements RelNode, Serializable {
         readBuilder.setExtensionTable(((ExtensionTableNode) currentSplitInfo).toProtobuf());
       } else if (currentSplitInfo instanceof OdpsScanNode) {
         readBuilder.setExtensionTable((ExtensionTable) currentSplitInfo.toProtobuf());
+      } else {
+        System.out.println("Unsupported split info type: " + currentSplitInfo.getClass());
       }
     }
     Rel.Builder builder = Rel.newBuilder();
