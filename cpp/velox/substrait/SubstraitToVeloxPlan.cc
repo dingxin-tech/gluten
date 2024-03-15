@@ -816,12 +816,16 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
   std::vector<std::string> outNames;
   outNames.reserve(colNameList.size());
 
+  // odps assignments is no use
+  std::unordered_map<std::string, std::shared_ptr<connector::ColumnHandle>> assignments;
+
   for (int idx = 0; idx < colNameList.size(); idx++) {
     auto outName = SubstraitParser::makeNodeName(planNodeId_, idx);
     outNames.emplace_back(outName);
+
+    auto convertName = std::make_shared<connector::odps::OdpsColumnHandle>(outName);
+    assignments.emplace(colNameList.at(idx), convertName);
   }
-  // odps assignments is no use
-  std::unordered_map<std::string, std::shared_ptr<connector::ColumnHandle>> assignments;
 
   auto outputType = ROW(std::move(outNames), std::move(veloxTypeList));
   auto tableScanNode = std::make_shared<core::TableScanNode>(
