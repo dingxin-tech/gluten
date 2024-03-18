@@ -279,6 +279,9 @@ case class WholeStageTransformer(child: SparkPlan, materializeInput: Boolean = f
             wsCxt.substraitContext.initSplitInfosIndex(0)
             wsCxt.substraitContext.setSplitInfos(splitInfos)
             val substraitPlan = wsCxt.root.toProtobuf
+            if (wsCxt.substraitContext.getSplitInfos.isEmpty) {
+              throw new RuntimeException("no split info error, how can this happen ?")
+            }
             GlutenPartition(index, substraitPlan.toByteArray)
         }
         (wsCxt, substraitPlanPartitions)
@@ -372,7 +375,12 @@ case class WholeStageTransformer(child: SparkPlan, materializeInput: Boolean = f
     //      ...
     //  p1n  |  p2n    => substraitContext.setSplitInfo([p1n, p2n])
     // FIXME: maybe ODPS Scan don't need to be combined [dingxin]
-    basicScanExecTransformers.map(_.getSplitInfos)
+    val allScanSplitInfos = basicScanExecTransformers.map(_.getSplitInfos)
+    allScanSplitInfos.zipWithIndex.foreach {
+      case (splitInfos, index) =>
+        logInfo(s"getSplitInfosFromScanTransformer $index: $splitInfos")
+    }
+    allScanSplitInfos
 //    val partitionLength = allScanSplitInfos.head.size
 //    if (allScanSplitInfos.exists(_.size != partitionLength)) {
 //      throw new GlutenException(

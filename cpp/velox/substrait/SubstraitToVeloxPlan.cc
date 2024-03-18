@@ -1019,7 +1019,7 @@ int32_t SubstraitToVeloxPlanConverter::getStreamIndex(const ::substrait::ReadRel
     // Get the index.
     std::string idxStr = filePath.substr(pos + prefix.size(), filePath.size());
     try {
-      std::out << "[debug] if here will triggered ? then get Stream index >= 0" << std::endl;
+      std::cout << "[debug] if here will triggered ? then get Stream index >= 0" << std::endl;
       return stoi(idxStr);
     } catch (const std::exception& err) {
       VELOX_FAIL(err.what());
@@ -1027,11 +1027,14 @@ int32_t SubstraitToVeloxPlanConverter::getStreamIndex(const ::substrait::ReadRel
   } else if (sRead.has_extension_table()) {
     // TODO: odps current not support stream ? [dingxin]
     return -1;
+  } else {
+    std::string debugString = sRead.DebugString();
+    std::cout << "get read node without any split, " + debugString << std::endl;
   }
   if (validationMode_) {
     return -1;
   }
-  VELOX_FAIL("Local file is expected.");
+  return -1;
 }
 
 void SubstraitToVeloxPlanConverter::extractJoinKeys(

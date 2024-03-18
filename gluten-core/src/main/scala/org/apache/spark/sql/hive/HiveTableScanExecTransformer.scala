@@ -105,8 +105,6 @@ class HiveTableScanExecTransformer(
   override def metricsUpdater(): MetricsUpdater =
     BackendsApiManager.getMetricsApiInstance.genHiveTableScanTransformerMetricsUpdater(metrics)
 
-  // Velox don't support this method
-
   @transient private lazy val partitions: Seq[InputPartition] = createPartitions()
 
   /**
@@ -305,7 +303,7 @@ class HiveTableScanExecTransformer(
     transformCtx
   }
 
-  override def nodeName: String = s"NativeScan hive ${relation.tableMeta.qualifiedName}"
+  override def nodeName: String = s"NativeScan odps ${relation.tableMeta.qualifiedName}"
 
   override def canEqual(other: Any): Boolean = other.isInstanceOf[HiveTableScanExecTransformer]
 
