@@ -33,6 +33,9 @@ import java.util.List;
 /** @author dingxin (zhangdingxin.zdx@alibaba-inc.com) */
 public class OdpsScanNode implements SplitInfo {
   private static final Logger LOG = LoggerFactory.getLogger(OdpsScanNode.class);
+
+  public static final OdpsScanNode EMPTY =
+      new OdpsScanNode(TableIdentifier.of("", "", ""), new IndexedInputSplit("EMPTY", 0));
   private String projectName;
   private String schemaName;
   private String tableName;

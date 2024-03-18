@@ -198,8 +198,10 @@ class HiveTableScanExecTransformer(
         futureResults.flatten.toArray
       } else {
         val scan = createTableScan(emptyColumn, Array.empty)
-        scan.getInputSplitAssigner.getAllSplits
+        val partititons = scan.getInputSplitAssigner.getAllSplits
           .map(split => OdpsScanPartition(split, scan))
+        logInfo(s"get partitions ${partititons.length}")
+        partititons.asInstanceOf[Array[InputPartition]]
       }
     } else {
       val scan = if (relation.partitionCols.nonEmpty) {

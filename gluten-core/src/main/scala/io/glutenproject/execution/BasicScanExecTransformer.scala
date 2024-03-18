@@ -22,7 +22,7 @@ import io.glutenproject.extension.ValidationResult
 import io.glutenproject.substrait.`type`.ColumnTypeNode
 import io.glutenproject.substrait.{SubstraitContext, SupportFormat}
 import io.glutenproject.substrait.plan.PlanBuilder
-import io.glutenproject.substrait.rel.{ReadRelNode, RelBuilder, SplitInfo}
+import io.glutenproject.substrait.rel.{OdpsScanNode, ReadRelNode, RelBuilder, SplitInfo}
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.expressions._
@@ -53,10 +53,16 @@ trait BasicScanExecTransformer extends LeafTransformSupport with SupportFormat {
   // TODO: Remove this expensive call when CH support scan custom partition location.
   def getInputFilePaths: Seq[String]
 
-  def getSplitInfos: Seq[SplitInfo] =
-    getPartitions.map(
+  def getSplitInfos: Seq[SplitInfo] = {
+    val splitInfos = getPartitions.map(
       BackendsApiManager.getIteratorApiInstance
         .genSplitInfo(_, getPartitionSchemas, fileFormat))
+    if (splitInfos.isEmpty) {
+      Seq(OdpsScanNode.EMPTY)
+    } else {
+      splitInfos
+    }
+  }
 
   // Velox don't support this method
   def doExecuteColumnarInternal(): RDD[ColumnarBatch] = {
