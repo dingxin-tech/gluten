@@ -18,6 +18,7 @@ package io.glutenproject.execution
 
 import io.glutenproject.{GlutenConfig, GlutenNumaBindingInfo}
 import io.glutenproject.backendsapi.BackendsApiManager
+import io.glutenproject.exception.GlutenException
 import io.glutenproject.expression._
 import io.glutenproject.extension.GlutenPlan
 import io.glutenproject.metrics.{GlutenTimeMetric, MetricsUpdater, NoopMetricsUpdater}
@@ -279,9 +280,6 @@ case class WholeStageTransformer(child: SparkPlan, materializeInput: Boolean = f
             wsCxt.substraitContext.initSplitInfosIndex(0)
             wsCxt.substraitContext.setSplitInfos(splitInfos)
             val substraitPlan = wsCxt.root.toProtobuf
-            if (wsCxt.substraitContext.getSplitInfos.isEmpty) {
-              throw new RuntimeException("no split info error, how can this happen ?")
-            }
             GlutenPartition(index, substraitPlan.toByteArray)
         }
         (wsCxt, substraitPlanPartitions)
@@ -374,19 +372,17 @@ case class WholeStageTransformer(child: SparkPlan, materializeInput: Boolean = f
     //  p14  |  p24
     //      ...
     //  p1n  |  p2n    => substraitContext.setSplitInfo([p1n, p2n])
-    // FIXME: maybe ODPS Scan don't need to be combined [dingxin]
     val allScanSplitInfos = basicScanExecTransformers.map(_.getSplitInfos)
     allScanSplitInfos.zipWithIndex.foreach {
       case (splitInfos, index) =>
         logInfo(s"getSplitInfosFromScanTransformer $index: $splitInfos")
     }
-    allScanSplitInfos
-//    val partitionLength = allScanSplitInfos.head.size
-//    if (allScanSplitInfos.exists(_.size != partitionLength)) {
-//      throw new GlutenException(
-//        "The partition length of all the scan transformer are not the same.")
-//    }
-//    allScanSplitInfos.transpose
+    val partitionLength = allScanSplitInfos.head.size
+    if (allScanSplitInfos.exists(_.size != partitionLength)) {
+      throw new GlutenException(
+        "The partition length of all the scan transformer are not the same.")
+    }
+    allScanSplitInfos.transpose
   }
 }
 

@@ -35,7 +35,7 @@ public class OdpsScanNode implements SplitInfo {
   private static final Logger LOG = LoggerFactory.getLogger(OdpsScanNode.class);
 
   public static final OdpsScanNode EMPTY =
-      new OdpsScanNode(TableIdentifier.of("project",  "table"), new IndexedInputSplit("EMPTY", 0));
+      new OdpsScanNode(TableIdentifier.of("project", "table"), new IndexedInputSplit("EMPTY", 0));
   private String projectName;
   private String schemaName;
   private String tableName;
