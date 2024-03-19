@@ -76,6 +76,13 @@ class HiveTableScanExecTransformer(
   @transient override lazy val metrics: Map[String, SQLMetric] =
     BackendsApiManager.getMetricsApiInstance.genHiveTableScanTransformerMetrics(sparkContext)
 
+//  @transient private lazy val hiveQlTable = HiveClientImpl.toHiveTable(relation.tableMeta)
+
+//  @transient private lazy val tableDesc = new TableDesc(
+//    hiveQlTable.getInputFormatClass,
+//    hiveQlTable.getOutputFormatClass,
+//    hiveQlTable.getMetadata)
+
   override def filterExprs(): Seq[Expression] = dataFilters
 
   override def outputAttributes(): Seq[Attribute] = output
@@ -250,19 +257,17 @@ class HiveTableScanExecTransformer(
           .asJava)
     }
 
-//    val readSizeInBytes = relation.tableMeta.stats.get.sizeInBytes.longValue
+    val readSizeInBytes = relation.tableMeta.stats.get.sizeInBytes.longValue
 
-
-    val splitOptions = SplitOptions.newBuilder().SplitByParallelism(SparkContext.getActive.get.defaultParallelism).build();
-//    val splitOptions = if (!emptyColumn) {
-//      val rawSizePerCore = ((readSizeInBytes / 1024 / 1024) /
-//        SparkContext.getActive.get.defaultParallelism) + 1
-//      val sizePerCore = math.max(math.min(rawSizePerCore, Int.MaxValue).toInt, 10)
-//      val splitSizeInMB = math.min(OdpsOptions.odpsSplitSize(conf), sizePerCore)
-//      SplitOptions.newBuilder().SplitByByteSize(splitSizeInMB * 1024L * 1024L).build()
-//    } else {
-//      SplitOptions.newBuilder().SplitByRowOffset().build()
-//    }
+    val splitOptions = if (!emptyColumn) {
+      val rawSizePerCore = ((readSizeInBytes / 1024 / 1024) /
+        SparkContext.getActive.get.defaultParallelism) + 1
+      val sizePerCore = math.max(math.min(rawSizePerCore, Int.MaxValue).toInt, 10)
+      val splitSizeInMB = math.min(OdpsOptions.odpsSplitSize(conf), sizePerCore)
+      SplitOptions.newBuilder().SplitByByteSize(splitSizeInMB * 1024L * 1024L).build()
+    } else {
+      SplitOptions.newBuilder().SplitByRowOffset().build()
+    }
 
     scanBuilder
       .withSplitOptions(splitOptions)
