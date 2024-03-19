@@ -96,6 +96,8 @@ message ReadRel {
     string table = 3;
     string sessionId = 4;
     int32 index = 5;
+    int64 startIndex = 6;
+    int64 numRecord = 7;
   }
 
   // Represents a list of files in input of a scan operation

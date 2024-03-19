@@ -439,6 +439,9 @@ WholeStageResultIteratorFirstStage::WholeStageResultIteratorFirstStage(
     // Partition index in scan info is not used.
     const auto& sessionId = scanInfo->sessionId;
     const auto& index = scanInfo->index;
+    const auto& row_index = scanInfo->row_index;
+    const auto& row_count = scanInfo->row_count;
+
     const auto& projectName = scanInfo->projectName;
     const auto& schemaName = scanInfo->schemaName;
     const auto& tableName = scanInfo->tableName;
@@ -447,7 +450,7 @@ WholeStageResultIteratorFirstStage::WholeStageResultIteratorFirstStage(
     connectorSplits.reserve(1);
 
     auto split = std::make_shared<velox::connector::odps::OdpsConnectorSplit>(
-          kOdpsConnectorId, projectName, tableName, schemaName, sessionId, index);
+          kOdpsConnectorId, projectName, tableName, schemaName, sessionId, index, row_index, row_count);
     connectorSplits.emplace_back(split);
 
     std::vector<velox::exec::Split> scanSplits;

@@ -19,6 +19,7 @@ package io.glutenproject.substrait.rel;
 import com.aliyun.odps.table.TableIdentifier;
 import com.aliyun.odps.table.read.split.InputSplit;
 import com.aliyun.odps.table.read.split.impl.IndexedInputSplit;
+import com.aliyun.odps.table.read.split.impl.RowRangeInputSplit;
 import com.google.protobuf.Any;
 import com.google.protobuf.MessageOrBuilder;
 import io.substrait.proto.ReadRel.ExtensionTable;
@@ -40,18 +41,23 @@ public class OdpsScanNode implements SplitInfo {
   private String schemaName;
   private String tableName;
   private String sessionId;
-  private Integer index;
+  private int index;
+  private long startIndex;
+  private long numRecord;
 
   public OdpsScanNode(TableIdentifier identifier, InputSplit inputSplit) {
     projectName = identifier.getProject();
     schemaName = identifier.getSchema();
     tableName = identifier.getTable();
-
     sessionId = inputSplit.getSessionId();
     if (inputSplit instanceof IndexedInputSplit) {
       index = ((IndexedInputSplit) inputSplit).getSplitIndex();
+      LOG.info("sessionId: {}, index: {}", sessionId, index);
+    } else if (inputSplit instanceof RowRangeInputSplit) {
+      startIndex = ((RowRangeInputSplit) inputSplit).getRowRange().getStartIndex();
+      numRecord = ((RowRangeInputSplit) inputSplit).getRowRange().getNumRecord();
+      LOG.info("sessionId: {}, startIndex: {}, numRecord: {}", sessionId, startIndex, numRecord);
     }
-    LOG.info("sessionId: " + sessionId + ", index: " + index);
   }
 
   @Override
@@ -68,6 +74,8 @@ public class OdpsScanNode implements SplitInfo {
             .setSchema(schemaName)
             .setTable(tableName)
             .setIndex(index)
+            .setStartIndex(startIndex)
+            .setNumRecord(numRecord)
             .build();
     Builder builder = ExtensionTable.newBuilder();
     builder.setDetail(Any.pack(odpsScanSplit));

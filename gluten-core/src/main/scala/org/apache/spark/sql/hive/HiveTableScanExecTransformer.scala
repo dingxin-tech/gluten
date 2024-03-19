@@ -24,7 +24,6 @@ import io.glutenproject.substrait.SubstraitContext
 import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat
 import io.glutenproject.substrait.rel.ReadRelNode
 
-import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.{CatalogTablePartition, HiveTableRelation}
@@ -45,6 +44,8 @@ import com.aliyun.odps.table.TableIdentifier
 import com.aliyun.odps.table.configuration.{ArrowOptions, SplitOptions}
 import com.aliyun.odps.table.configuration.ArrowOptions.TimestampUnit
 import com.aliyun.odps.table.read.{TableBatchReadSession, TableReadSessionBuilder}
+import com.aliyun.odps.table.read.split.InputSplit
+import com.aliyun.odps.table.read.split.impl.RowRangeInputSplit
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import org.apache.hadoop.mapred.TextInputFormat
 
@@ -198,10 +199,11 @@ class HiveTableScanExecTransformer(
         futureResults.flatten.toArray
       } else {
         val scan = createTableScan(emptyColumn, Array.empty)
-        val partititons = scan.getInputSplitAssigner.getAllSplits
-          .map(split => OdpsScanPartition(split, scan))
-        logInfo(s"get partitions ${partititons.length}")
-        partititons.asInstanceOf[Array[InputPartition]]
+        val count = scan.getInputSplitAssigner.getTotalRowCount
+        val partitions =
+          divideEvenly(scan.getId, count).map(split => OdpsScanPartition(split, scan))
+        logInfo(s"get partitions ${partitions.length}")
+        partitions.asInstanceOf[Array[InputPartition]]
       }
     } else {
       val scan = if (relation.partitionCols.nonEmpty) {
@@ -211,6 +213,23 @@ class HiveTableScanExecTransformer(
       }
       Array(OdpsEmptyColumnPartition(scan.getInputSplitAssigner.getTotalRowCount))
     }
+  }
+
+  private def divideEvenly(sessionId: String, totalCount: Long): Array[InputSplit] = {
+    val parts = Array.fill(8)(new RowRangeInputSplit("EMPTY", 0, 0))
+    if (totalCount < 4096 * 8) {
+      parts(0) = new RowRangeInputSplit(sessionId, 0, totalCount)
+      return parts.asInstanceOf[Array[InputSplit]]
+    }
+    val baseSize = totalCount / 8
+    val remainder = totalCount % 8
+
+    for (i <- 0 until 8) {
+      val start = i * baseSize + math.min(i, remainder)
+      val end = baseSize + (if (i < remainder) 1 else 0) - 1
+      parts(i) = new RowRangeInputSplit(sessionId, start, end)
+    }
+    parts.asInstanceOf[Array[InputSplit]]
   }
 
   private def createTableScan(
@@ -257,17 +276,7 @@ class HiveTableScanExecTransformer(
           .asJava)
     }
 
-    val readSizeInBytes = relation.tableMeta.stats.get.sizeInBytes.longValue
-
-    val splitOptions = if (!emptyColumn) {
-      val rawSizePerCore = ((readSizeInBytes / 1024 / 1024) /
-        SparkContext.getActive.get.defaultParallelism) + 1
-      val sizePerCore = math.max(math.min(rawSizePerCore, Int.MaxValue).toInt, 10)
-      val splitSizeInMB = math.min(OdpsOptions.odpsSplitSize(conf), sizePerCore)
-      SplitOptions.newBuilder().SplitByByteSize(splitSizeInMB * 1024L * 1024L).build()
-    } else {
-      SplitOptions.newBuilder().SplitByRowOffset().build()
-    }
+    val splitOptions = SplitOptions.newBuilder().SplitByRowOffset().build()
 
     scanBuilder
       .withSplitOptions(splitOptions)

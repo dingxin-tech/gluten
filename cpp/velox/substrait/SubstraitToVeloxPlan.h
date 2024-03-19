@@ -37,6 +37,8 @@ struct SplitInfo {
   std::string sessionId;
 
   int index;
+  long row_index;
+  long row_count;
 };
 
 /// This class is used to convert the Substrait plan into Velox plan.
