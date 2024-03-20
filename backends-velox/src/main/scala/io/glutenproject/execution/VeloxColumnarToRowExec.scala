@@ -69,7 +69,7 @@ case class VeloxColumnarToRowExec(child: SparkPlan) extends ColumnarToRowExecBas
     val numOutputRows = longMetric("numOutputRows")
     val numInputBatches = longMetric("numInputBatches")
     val convertTime = longMetric("convertTime")
-    logInfo("VeloxColumnarToRowExec get spark plan: " + child.toJSON)
+    logDebug("VeloxColumnarToRowExec get spark plan: " + child.toJSON)
     child.executeColumnar().mapPartitions {
       it =>
         VeloxColumnarToRowExec.toRowIterator(

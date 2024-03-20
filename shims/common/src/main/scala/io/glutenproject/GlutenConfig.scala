@@ -1094,7 +1094,7 @@ object GlutenConfig {
       .checkValue(
         logLevel => Set("TRACE", "DEBUG", "INFO", "WARN", "ERROR").contains(logLevel),
         "Valid values are 'trace', 'debug', 'info', 'warn' and 'error'.")
-      .createWithDefault("INFO")
+      .createWithDefault("DEBUG")
 
   val SUBSTRAIT_PLAN_LOG_LEVEL =
     buildConf("spark.gluten.sql.substrait.plan.logLevel")
@@ -1104,7 +1104,7 @@ object GlutenConfig {
       .checkValue(
         logLevel => Set("TRACE", "DEBUG", "INFO", "WARN", "ERROR").contains(logLevel),
         "Valid values are 'trace', 'debug', 'info', 'warn' and 'error'.")
-      .createWithDefault("INFO")
+      .createWithDefault("DEBUG")
 
   val VALIDATION_LOG_LEVEL =
     buildConf("spark.gluten.sql.validation.logLevel")
@@ -1136,7 +1136,7 @@ object GlutenConfig {
     buildConf(GLUTEN_DEBUG_MODE)
       .internal()
       .booleanConf
-      .createWithDefault(true)
+      .createWithDefault(false)
 
   val BENCHMARK_TASK_STAGEID =
     buildConf("spark.gluten.sql.benchmark_task.stageId")

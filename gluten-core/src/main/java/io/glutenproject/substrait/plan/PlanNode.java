@@ -89,7 +89,7 @@ public class PlanNode implements Serializable {
     if (extension != null) {
       planBuilder.setAdvancedExtensions(extension.toProtobuf());
     }
-    LOG.info("plan: {}", planBuilder.build());
+    LOG.debug("plan: {}", planBuilder.build());
     return planBuilder.build();
   }
 }

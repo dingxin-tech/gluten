@@ -24,6 +24,7 @@ import io.glutenproject.substrait.SubstraitContext
 import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat
 import io.glutenproject.substrait.rel.ReadRelNode
 
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.{CatalogTablePartition, HiveTableRelation}
@@ -199,11 +200,10 @@ class HiveTableScanExecTransformer(
         futureResults.flatten.toArray
       } else {
         val scan = createTableScan(emptyColumn, Array.empty)
-        val count = scan.getInputSplitAssigner.getTotalRowCount
-        val partitions =
-          divideEvenly(scan.getId, count).map(split => OdpsScanPartition(split, scan))
-        logInfo(s"get partitions ${partitions.length}")
-        partitions.asInstanceOf[Array[InputPartition]]
+        val partititons = scan.getInputSplitAssigner.getAllSplits
+          .map(split => OdpsScanPartition(split, scan))
+        logInfo(s"get partitions ${partititons.length}")
+        partititons.asInstanceOf[Array[InputPartition]]
       }
     } else {
       val scan = if (relation.partitionCols.nonEmpty) {
@@ -276,7 +276,17 @@ class HiveTableScanExecTransformer(
           .asJava)
     }
 
-    val splitOptions = SplitOptions.newBuilder().SplitByRowOffset().build()
+    val readSizeInBytes = relation.tableMeta.stats.get.sizeInBytes.longValue
+
+    val splitOptions = if (!emptyColumn) {
+      val rawSizePerCore = ((readSizeInBytes / 1024 / 1024) /
+        SparkContext.getActive.get.defaultParallelism) + 1
+      val sizePerCore = math.max(math.min(rawSizePerCore, Int.MaxValue).toInt, 10)
+      val splitSizeInMB = math.min(OdpsOptions.odpsSplitSize(conf), sizePerCore)
+      SplitOptions.newBuilder().SplitByByteSize(splitSizeInMB * 1024L * 1024L).build()
+    } else {
+      SplitOptions.newBuilder().SplitByRowOffset().build()
+    }
 
     scanBuilder
       .withSplitOptions(splitOptions)

@@ -797,8 +797,8 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
         splitInfo->tableName = odpsScanSplit.table();
         splitInfo->sessionId = odpsScanSplit.sessionid();
         splitInfo->index = odpsScanSplit.index();
-        splitInfo->row_index = odpsScanSplit.startIndex();
-        splitInfo->row_count = odpsScanSplit.numRecord();
+        splitInfo->row_index = odpsScanSplit.startindex();
+        splitInfo->row_count = odpsScanSplit.numrecord();
       } else {
         std::cerr << "Error unpacking ExtensionTable detail as OdpsScanSplit." << std::endl;
       }
