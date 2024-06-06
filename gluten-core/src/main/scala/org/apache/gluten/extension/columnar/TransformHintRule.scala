@@ -43,6 +43,7 @@ import org.apache.spark.sql.execution.joins._
 import org.apache.spark.sql.execution.python.{ArrowEvalPythonExec, BatchEvalPythonExec}
 import org.apache.spark.sql.execution.window.{WindowExec, WindowGroupLimitExecShim}
 import org.apache.spark.sql.hive.HiveTableScanExecTransformer
+import org.apache.spark.sql.odps.OdpsTableInsertExecTransformer
 import org.apache.spark.sql.types.StringType
 
 import org.apache.commons.lang3.exception.ExceptionUtils
@@ -377,6 +378,7 @@ case class AddTransformHintRule() extends Rule[SparkPlan] {
           }
         case plan if HiveTableScanExecTransformer.isOdpsTableScan(plan) =>
           HiveTableScanExecTransformer.validate(plan).tagOnFallback(plan)
+        case plan if OdpsTableInsertExecTransformer.isOdpsTableWrite(plan) =>
         case plan: ProjectExec =>
           val transformer = ProjectExecTransformer(plan.projectList, plan.child)
           transformer.doValidate().tagOnFallback(plan)

@@ -652,7 +652,7 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
       tableColumnNames,
       nullptr, /*aggregationNode*/
       std::make_shared<core::InsertTableHandle>(
-          kHiveConnectorId,
+          kOdpsConnectorId,
           makeHiveInsertTableHandle(
               tableColumnNames, /*inputType->names() clolumn name is different*/
               inputType->children(),
