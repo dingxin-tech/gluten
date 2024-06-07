@@ -17,20 +17,53 @@
 package org.apache.spark.sql.odps
 
 import org.apache.gluten.backendsapi.BackendsApiManager
-import org.apache.gluten.execution.UnaryTransformSupport
+import org.apache.gluten.execution.{TransformContext, TransformSupport, UnaryTransformSupport}
+import org.apache.gluten.expression.ConverterUtils
+import org.apache.gluten.extension.ValidationResult
 import org.apache.gluten.metrics.MetricsUpdater
+import org.apache.gluten.substrait.`type`.{ColumnTypeNode, TypeBuilder}
+import org.apache.gluten.substrait.SubstraitContext
+import org.apache.gluten.substrait.extensions.ExtensionBuilder
+import org.apache.gluten.substrait.rel.{RelBuilder, RelNode}
 
-import org.apache.spark.sql.catalyst.catalog.CatalogTypes.TablePartitionSpec
-import org.apache.spark.sql.catalyst.expressions.Attribute
-import org.apache.spark.sql.execution.SparkPlan;
+import org.apache.spark.SparkException
+import org.apache.spark.sql.AnalysisException
+import org.apache.spark.sql.catalyst.catalog.{CatalogTable, CatalogTableType}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeSet}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.errors.QueryExecutionErrors
+import org.apache.spark.sql.execution.SparkPlan
+import org.apache.spark.sql.execution.command.DataWritingCommandExec
+import org.apache.spark.sql.hive.execution.InsertIntoOdpsTable
+import org.apache.spark.sql.types._
+
+import com.aliyun.odps.PartitionSpec
+import org.apache.hadoop.hive.ql.ErrorMsg
+
+import java.lang
+
+import scala.collection.JavaConverters.seqAsJavaListConverter
+import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`;
 
 /** @author dingxin (zhangdingxin.zdx@alibaba-inc.com) */
+@SuppressWarnings(Array("io.github.zhztheplayer.scalawarts.InheritFromCaseClass"))
 class OdpsTableInsertExecTransformer(
     child: SparkPlan,
-    partitionColumns: Seq[Attribute],
-    options: Map[String, String],
-    staticPartitions: TablePartitionSpec)
-  extends UnaryTransformSupport {
+    table: CatalogTable,
+    partition: Map[String, Option[String]],
+    query: LogicalPlan,
+    overwrite: Boolean,
+    ifPartitionNotExists: Boolean,
+    outputColumnNames: Seq[String])
+  extends InsertIntoOdpsTable(
+    table,
+    partition,
+    query,
+    overwrite,
+    ifPartitionNotExists,
+    outputColumnNames
+  )
+  with UnaryTransformSupport {
   // Note: "metrics" is made transient to avoid sending driver-side metrics to tasks.
   @transient override lazy val metrics =
     BackendsApiManager.getMetricsApiInstance.genWriteFilesTransformerMetrics(sparkContext)
@@ -40,23 +73,157 @@ class OdpsTableInsertExecTransformer(
 
   override def output: Seq[Attribute] = Seq.empty
 
-  override protected def withNewChildInternal(
-      newChild: SparkPlan): OdpsTableInsertExecTransformer = {
-    null
+  def getRelNode(
+      context: SubstraitContext,
+      attributes: Seq[Attribute],
+      operatorId: lang.Long,
+      root: RelNode,
+      validation: Boolean): RelNode = {
+    if (table.tableType == CatalogTableType.EXTERNAL) {
+      throw new SparkException(s"Unsupported table type for table write ${table.tableType}")
+    }
+
+    val numDynamicPartitions = partition.values.count(_.isEmpty)
+    val numStaticPartitions = partition.values.count(_.nonEmpty)
+    val odpsPartitionSpec = new PartitionSpec
+
+    val partitionSchema = table.partitionSchema
+    val partitionColumnNames = table.partitionColumnNames
+
+    // By this time, the partition map must match the table's partition columns
+    if (partitionColumnNames.toSet != partition.keySet) {
+      throw QueryExecutionErrors.requestedPartitionsMismatchTablePartitionsError(table, partition)
+    }
+
+    val outputPartitionColumns =
+      outputColumns.filter(c => partitionSchema.getFieldIndex(c.name).isDefined)
+    val outputPartitionSet = AttributeSet(outputPartitionColumns)
+    val dataColumns = outputColumns.filterNot(outputPartitionSet.contains)
+
+    if (partitionSchema.nonEmpty) {
+      // val partitionSpec = partition.filter(_._2.nonEmpty).map { case (k, v) => k -> v.get }
+      val partitionSpec = partition.map {
+        // TODO: null partition
+        case (key, Some(value)) => key -> value
+        case (key, None) => key -> ""
+      }
+
+      // Validate partition spec if there exist any dynamic partitions
+      if (numDynamicPartitions > 0) {
+        // Report error if any static partition appears after a dynamic partition
+        val isDynamic = partitionColumnNames.map(partitionSpec(_).isEmpty)
+        if (isDynamic.init.zip(isDynamic.tail).contains((true, false))) {
+          throw new AnalysisException(ErrorMsg.PARTITION_DYN_STA_ORDER.getMsg)
+        }
+
+        val dynamicPartitionSchema = StructType(partitionSchema.takeRight(numDynamicPartitions))
+        dynamicPartitionSchema.map(_.dataType).foreach {
+          case StringType | LongType | IntegerType | ShortType | ByteType =>
+          case dt: DataType =>
+            throw new SparkException(s"Unsupported partition column type: ${dt.simpleString}")
+        }
+      }
+
+      if (numStaticPartitions > 0) {
+        var part = 0
+        partitionColumnNames.foreach {
+          field =>
+            if (part < numStaticPartitions) {
+              odpsPartitionSpec.set(field, partitionSpec(field))
+              part = part + 1
+            }
+        }
+      }
+
+      val isStaticPartition = numStaticPartitions > 0 && numDynamicPartitions == 0
+    }
+
+    val project = table.database
+    val tableName = table.identifier.table
+
+    print(project)
+    print(tableName)
+    print(odpsPartitionSpec)
+
+    print(partitionSchema)
+    print(partitionColumnNames)
+
+    val childCtx = child.asInstanceOf[TransformSupport].transform(context)
+
+    val typeNodes = ConverterUtils.collectAttributeTypeNodes(attributes)
+
+    val columnTypeNodes = new java.util.ArrayList[ColumnTypeNode]()
+    val inputAttributes = new java.util.ArrayList[Attribute]()
+    val nameList =
+      ConverterUtils.collectAttributeNames(inputAttributes.toSeq)
+    val extensionNode = ExtensionBuilder.makeAdvancedExtension(createEnhancement(attributes))
+
+    RelBuilder.makeWriteRel(
+      childCtx.root,
+      typeNodes,
+      nameList,
+      columnTypeNodes,
+      extensionNode,
+      context,
+      operatorId)
   }
 
-  override def productElement(n: Int): Any = null
+  def createEnhancement(output: Seq[Attribute]): com.google.protobuf.Any = {
+    val inputTypeNodes = output.map {
+      attr => ConverterUtils.getTypeNode(attr.dataType, attr.nullable)
+    }
+    print("[debug] inputTypeNodes: " + inputTypeNodes)
 
-  override def productArity: Int = null
+    BackendsApiManager.getTransformerApiInstance.packPBMessage(
+      TypeBuilder.makeStruct(false, inputTypeNodes.asJava).toProtobuf)
+  }
 
-  override def canEqual(that: Any): Boolean = false
-
-  override def child: SparkPlan = null
+  override protected def doTransform(context: SubstraitContext): TransformContext = {
+    val childCtx = child.asInstanceOf[TransformSupport].transform(context)
+    val operatorId = context.nextOperatorId(this.nodeName)
+    val currRel =
+      getRelNode(context, child.output, operatorId, childCtx.root, validation = false)
+    assert(currRel != null, "Write Rel should be valid")
+    print("currRel:" + currRel.toProtobuf.toString)
+    TransformContext(childCtx.outputAttributes, output, currRel)
+  }
 }
 
 object OdpsTableInsertExecTransformer {
   def isOdpsTableWrite(plan: SparkPlan): Boolean = {
-    print(s"isOdpsTableScan: ${plan.getClass.getName}")
-    false
+    plan.isInstanceOf[DataWritingCommandExec]
+  }
+
+  def validate(plan: SparkPlan): ValidationResult = {
+    plan match {
+      case dataWritingCommandExec: DataWritingCommandExec =>
+        if (dataWritingCommandExec.cmd.isInstanceOf[InsertIntoOdpsTable]) {
+          print("is InsertIntoOdpsTable")
+          ValidationResult.ok
+        } else {
+          ValidationResult.notOk("Is not InsertIntoOdpsTable")
+        }
+      case _ => ValidationResult.notOk("Is not InsertIntoOdpsTable")
+    }
+  }
+
+  def apply(plan: SparkPlan): OdpsTableInsertExecTransformer = {
+    plan match {
+      case dataWritingCommandExec: DataWritingCommandExec =>
+        val insertIntoOdpsTable = dataWritingCommandExec.cmd.asInstanceOf[InsertIntoOdpsTable]
+
+        new OdpsTableInsertExecTransformer(
+          dataWritingCommandExec.child,
+          insertIntoOdpsTable.table,
+          insertIntoOdpsTable.partition,
+          insertIntoOdpsTable.query,
+          insertIntoOdpsTable.overwrite,
+          insertIntoOdpsTable.ifPartitionNotExists,
+          insertIntoOdpsTable.outputColumnNames
+        )
+      case _ =>
+        throw new UnsupportedOperationException(
+          s"Can't transform HiveTableScanExecTransformer from ${plan.getClass.getSimpleName}")
+    }
   }
 }

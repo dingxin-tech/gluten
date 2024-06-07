@@ -37,6 +37,7 @@ import org.apache.spark.sql.execution.joins._
 import org.apache.spark.sql.execution.python.{ArrowEvalPythonExec, BatchEvalPythonExec}
 import org.apache.spark.sql.execution.window.{WindowExec, WindowGroupLimitExecShim}
 import org.apache.spark.sql.hive.HiveTableScanExecTransformer
+import org.apache.spark.sql.odps.OdpsTableInsertExecTransformer
 
 /**
  * Converts a vanilla Spark plan node into Gluten plan node. Gluten plan is supposed to be executed
@@ -306,6 +307,9 @@ object OffloadOthers {
           val child = plan.child
           logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
           ExpandExecTransformer(plan.projections, plan.output, child)
+        case plan if OdpsTableInsertExecTransformer.isOdpsTableWrite(plan) =>
+          print(s"Columnar Processing for ${plan.getClass} is currently supported.")
+          OdpsTableInsertExecTransformer.apply(plan)
         case plan: WriteFilesExec =>
           val child = plan.child
           logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")

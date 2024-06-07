@@ -379,6 +379,7 @@ case class AddTransformHintRule() extends Rule[SparkPlan] {
         case plan if HiveTableScanExecTransformer.isOdpsTableScan(plan) =>
           HiveTableScanExecTransformer.validate(plan).tagOnFallback(plan)
         case plan if OdpsTableInsertExecTransformer.isOdpsTableWrite(plan) =>
+          OdpsTableInsertExecTransformer.validate(plan).tagOnFallback(plan)
         case plan: ProjectExec =>
           val transformer = ProjectExecTransformer(plan.projectList, plan.child)
           transformer.doValidate().tagOnFallback(plan)
