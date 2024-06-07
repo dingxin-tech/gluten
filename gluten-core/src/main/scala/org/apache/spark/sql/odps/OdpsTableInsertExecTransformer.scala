@@ -47,23 +47,20 @@ import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 
 /** @author dingxin (zhangdingxin.zdx@alibaba-inc.com) */
 @SuppressWarnings(Array("io.github.zhztheplayer.scalawarts.InheritFromCaseClass"))
-class OdpsTableInsertExecTransformer(
-    child: SparkPlan,
-    table: CatalogTable,
-    partition: Map[String, Option[String]],
-    query: LogicalPlan,
-    overwrite: Boolean,
-    ifPartitionNotExists: Boolean,
-    outputColumnNames: Seq[String])
-  extends InsertIntoOdpsTable(
-    table,
-    partition,
-    query,
-    overwrite,
-    ifPartitionNotExists,
-    outputColumnNames
+class OdpsTableInsertExecTransformer(child: SparkPlan, insertIntoOdpsTable: InsertIntoOdpsTable)
+  extends DataWritingCommandExec(
+    insertIntoOdpsTable,
+    child
   )
   with UnaryTransformSupport {
+
+  val table: CatalogTable = insertIntoOdpsTable.table
+  val partition: Map[String, Option[String]] = insertIntoOdpsTable.partition
+  val query: LogicalPlan = insertIntoOdpsTable.query
+  val overwrite: Boolean = insertIntoOdpsTable.overwrite
+  val ifPartitionNotExists: Boolean = insertIntoOdpsTable.ifPartitionNotExists
+  val outputColumnNames: Seq[String] = insertIntoOdpsTable.outputColumnNames
+
   // Note: "metrics" is made transient to avoid sending driver-side metrics to tasks.
   @transient override lazy val metrics =
     BackendsApiManager.getMetricsApiInstance.genWriteFilesTransformerMetrics(sparkContext)
@@ -96,9 +93,9 @@ class OdpsTableInsertExecTransformer(
     }
 
     val outputPartitionColumns =
-      outputColumns.filter(c => partitionSchema.getFieldIndex(c.name).isDefined)
+      cmd.outputColumns.filter(c => partitionSchema.getFieldIndex(c.name).isDefined)
     val outputPartitionSet = AttributeSet(outputPartitionColumns)
-    val dataColumns = outputColumns.filterNot(outputPartitionSet.contains)
+    val dataColumns = cmd.outputColumns.filterNot(outputPartitionSet.contains)
 
     if (partitionSchema.nonEmpty) {
       // val partitionSpec = partition.filter(_._2.nonEmpty).map { case (k, v) => k -> v.get }
@@ -214,12 +211,7 @@ object OdpsTableInsertExecTransformer {
 
         new OdpsTableInsertExecTransformer(
           dataWritingCommandExec.child,
-          insertIntoOdpsTable.table,
-          insertIntoOdpsTable.partition,
-          insertIntoOdpsTable.query,
-          insertIntoOdpsTable.overwrite,
-          insertIntoOdpsTable.ifPartitionNotExists,
-          insertIntoOdpsTable.outputColumnNames
+          insertIntoOdpsTable
         )
       case _ =>
         throw new UnsupportedOperationException(
