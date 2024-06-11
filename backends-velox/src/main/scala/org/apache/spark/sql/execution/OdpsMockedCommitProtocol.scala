@@ -39,20 +39,20 @@ class OdpsMockedCommitProtocol(jobTrackerID: String) {
     new TaskAttemptContextImpl(new Configuration(), taskAttemptId)
   }
   def newTaskAttemptTempPath() = {
-    println("newTaskAttemptTempPath")
+    print("newTaskAttemptTempPath")
     "path"
   }
 
   def setupTask() = {
-    println("setupTask")
+    print("setupTask")
   }
 
   def commitTask(): Unit = {
-    println("commitTask")
+    print("commitTask")
   }
 
   def abortTask(): Unit = {
-    println("abortTask")
+    print("abortTask")
   }
   def getJobId: String = jobId.toString
 
