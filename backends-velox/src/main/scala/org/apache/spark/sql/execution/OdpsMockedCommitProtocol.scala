@@ -17,11 +17,12 @@
 package org.apache.spark.sql.execution
 
 import org.apache.spark.TaskContext
+import org.apache.spark.internal.io.SparkHadoopWriterUtils
 import org.apache.spark.internal.io.SparkHadoopWriterUtils.createJobID
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.{TaskAttemptContext, TaskAttemptID, TaskID, TaskType}
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
-import org.apache.spark.internal.io.SparkHadoopWriterUtils
 
 import java.util.Date
 
