@@ -18,10 +18,12 @@ package org.apache.spark.sql.execution
 
 import org.apache.spark.TaskContext
 import org.apache.spark.internal.io.SparkHadoopWriterUtils.createJobID
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.{TaskAttemptContext, TaskAttemptID, TaskID, TaskType}
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
+import org.apache.spark.internal.io.SparkHadoopWriterUtils
+
+import java.util.Date
 
 /** @author dingxin (zhangdingxin.zdx@alibaba-inc.com) */
 class OdpsMockedCommitProtocol(jobTrackerID: String) {
@@ -29,7 +31,9 @@ class OdpsMockedCommitProtocol(jobTrackerID: String) {
   val sparkStageId = TaskContext.get().stageId()
   val sparkPartitionId = TaskContext.get().partitionId()
   val sparkAttemptNumber = TaskContext.get().taskAttemptId().toInt & Int.MaxValue
-  private val jobId = createJobID(jobTrackerID, sparkStageId)
+
+  val jobTrackerID2 = SparkHadoopWriterUtils.createJobTrackerID(new Date())
+  private val jobId = createJobID(jobTrackerID2, sparkStageId)
 
   private val taskId = new TaskID(jobId, TaskType.MAP, sparkPartitionId)
 

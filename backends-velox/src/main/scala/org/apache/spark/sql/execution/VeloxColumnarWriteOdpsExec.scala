@@ -171,7 +171,7 @@ class VeloxColumnarWriteOdpsRDD(
   }
 
   override def compute(split: Partition, context: TaskContext): Iterator[WriterCommitMessage] = {
-    val commitProtocol = new OdpsMockedCommitProtocol()
+    val commitProtocol = new OdpsMockedCommitProtocol("jobTrackerId")
 
     commitProtocol.setupTask()
     val writePath = commitProtocol.newTaskAttemptTempPath()
