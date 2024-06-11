@@ -21,25 +21,19 @@ import org.apache.gluten.execution.{TransformContext, TransformSupport, UnaryTra
 import org.apache.gluten.expression.ConverterUtils
 import org.apache.gluten.extension.ValidationResult
 import org.apache.gluten.metrics.MetricsUpdater
-import org.apache.gluten.sql.shims.SparkShimLoader
 import org.apache.gluten.substrait.`type`.{ColumnTypeNode, TypeBuilder}
 import org.apache.gluten.substrait.SubstraitContext
 import org.apache.gluten.substrait.extensions.ExtensionBuilder
 import org.apache.gluten.substrait.rel.{RelBuilder, RelNode}
 
-import org.apache.spark.{SparkException, TaskContext}
-import org.apache.spark.internal.io.SparkHadoopWriterUtils
-import org.apache.spark.rdd.RDD
+import org.apache.spark.SparkException
 import org.apache.spark.sql.AnalysisException
-import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.catalog.{CatalogTable, CatalogTableType}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeSet}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.connector.write.WriterCommitMessage
 import org.apache.spark.sql.errors.QueryExecutionErrors
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.command.DataWritingCommandExec
-import org.apache.spark.sql.execution.datasources.WriteFilesSpec
 import org.apache.spark.sql.hive.execution.InsertIntoOdpsTable
 import org.apache.spark.sql.types._
 
@@ -47,7 +41,6 @@ import com.aliyun.odps.PartitionSpec
 import org.apache.hadoop.hive.ql.ErrorMsg
 
 import java.lang
-import java.util.Date
 
 import scala.collection.JavaConverters.seqAsJavaListConverter
 import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`;
@@ -76,37 +69,6 @@ class OdpsTableInsertExecTransformer(child: SparkPlan, insertIntoOdpsTable: Inse
     BackendsApiManager.getMetricsApiInstance.genWriteFilesTransformerMetricsUpdater(metrics)
 
   override def output: Seq[Attribute] = Seq.empty
-
-  override def doExecuteWrite(writeFilesSpec: WriteFilesSpec): RDD[WriterCommitMessage] = {
-    print(writeFilesSpec)
-    val jobTrackerID = SparkHadoopWriterUtils.createJobTrackerID(new Date())
-    writeFilesForEmptyRDD(writeFilesSpec, jobTrackerID)
-  }
-
-  private def writeFilesForEmptyRDD(
-      writeFilesSpec: WriteFilesSpec,
-      jobTrackerID: String): RDD[WriterCommitMessage] = {
-    val description = writeFilesSpec.description
-    val committer = writeFilesSpec.committer
-    val rddWithNonEmptyPartitions = session.sparkContext.parallelize(Seq.empty[InternalRow], 1)
-    rddWithNonEmptyPartitions.mapPartitionsInternal {
-      iterator =>
-        val sparkStageId = TaskContext.get().stageId()
-        val sparkPartitionId = TaskContext.get().partitionId()
-        val sparkAttemptNumber = TaskContext.get().taskAttemptId().toInt & Int.MaxValue
-
-        val ret = SparkShimLoader.getSparkShims.writeFilesExecuteTask(
-          description,
-          jobTrackerID,
-          sparkStageId,
-          sparkPartitionId,
-          sparkAttemptNumber,
-          committer,
-          iterator
-        )
-        Iterator(ret)
-    }
-  }
 
   def getRelNode(
       context: SubstraitContext,
