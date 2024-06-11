@@ -38,12 +38,13 @@ class OdpsMockedCommitProtocol(jobTrackerID: String) {
   val taskAttemptContext: TaskAttemptContext = {
     new TaskAttemptContextImpl(new Configuration(), taskAttemptId)
   }
-  def newTaskAttemptTempPath() = {
+
+  def newTaskAttemptTempPath(): String = {
     print("newTaskAttemptTempPath")
     "path"
   }
 
-  def setupTask() = {
+  def setupTask(): Unit = {
     print("setupTask")
   }
 
