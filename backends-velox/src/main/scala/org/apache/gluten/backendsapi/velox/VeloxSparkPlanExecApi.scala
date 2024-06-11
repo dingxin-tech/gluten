@@ -58,6 +58,7 @@ import org.apache.spark.sql.execution.python.ArrowEvalPythonExec
 import org.apache.spark.sql.execution.utils.ExecUtil
 import org.apache.spark.sql.expression.{UDFExpression, UDFResolver, UserDefinedAggregateFunction}
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.odps.OdpsTableInsertExecTransformer
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
@@ -532,13 +533,23 @@ class VeloxSparkPlanExecApi extends SparkPlanExecApi {
       bucketSpec: Option[BucketSpec],
       options: Map[String, String],
       staticPartitions: TablePartitionSpec): SparkPlan = {
-    VeloxColumnarWriteFilesExec(
-      child,
-      fileFormat,
-      partitionColumns,
-      bucketSpec,
-      options,
-      staticPartitions)
+    if (child.isInstanceOf[OdpsTableInsertExecTransformer]) {
+      VeloxColumnarWriteOdpsExec(
+        child,
+        fileFormat,
+        partitionColumns,
+        bucketSpec,
+        options,
+        staticPartitions)
+    } else {
+      VeloxColumnarWriteFilesExec(
+        child,
+        fileFormat,
+        partitionColumns,
+        bucketSpec,
+        options,
+        staticPartitions)
+    }
   }
 
   override def createColumnarArrowEvalPythonExec(

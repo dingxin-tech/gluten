@@ -309,7 +309,15 @@ object OffloadOthers {
           ExpandExecTransformer(plan.projections, plan.output, child)
         case plan if OdpsTableInsertExecTransformer.isOdpsTableWrite(plan) =>
           print(s"Columnar Processing for ${plan.getClass} is currently supported.")
-          OdpsTableInsertExecTransformer.apply(plan)
+          val odpsInsertTransformer = OdpsTableInsertExecTransformer.apply(plan)
+          BackendsApiManager.getSparkPlanExecApiInstance.createColumnarWriteFilesExec(
+            odpsInsertTransformer,
+            null,
+            null,
+            null,
+            null,
+            null
+          )
         case plan: WriteFilesExec =>
           val child = plan.child
           logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
