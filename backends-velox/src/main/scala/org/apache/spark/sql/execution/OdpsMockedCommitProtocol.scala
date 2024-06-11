@@ -34,7 +34,7 @@ class OdpsMockedCommitProtocol(jobTrackerID: String) {
   val sparkAttemptNumber = TaskContext.get().taskAttemptId().toInt & Int.MaxValue
 
   val jobTrackerID2 = SparkHadoopWriterUtils.createJobTrackerID(new Date())
-  private val jobId = createJobID(jobTrackerID2, sparkStageId)
+  private val jobId = createJobID(new Date(), sparkStageId)
 
   private val taskId = new TaskID(jobId, TaskType.MAP, sparkPartitionId)
 

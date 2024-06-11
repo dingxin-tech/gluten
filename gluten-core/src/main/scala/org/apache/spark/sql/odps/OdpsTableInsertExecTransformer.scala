@@ -47,12 +47,10 @@ import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 
 /** @author dingxin (zhangdingxin.zdx@alibaba-inc.com) */
 @SuppressWarnings(Array("io.github.zhztheplayer.scalawarts.InheritFromCaseClass"))
-class OdpsTableInsertExecTransformer(child: SparkPlan, insertIntoOdpsTable: InsertIntoOdpsTable)
-  extends DataWritingCommandExec(
-    insertIntoOdpsTable,
-    child
-  )
-  with UnaryTransformSupport {
+case class OdpsTableInsertExecTransformer(
+    child: SparkPlan,
+    insertIntoOdpsTable: InsertIntoOdpsTable)
+  extends UnaryTransformSupport {
 
   val table: CatalogTable = insertIntoOdpsTable.table
   val partition: Map[String, Option[String]] = insertIntoOdpsTable.partition
@@ -93,9 +91,9 @@ class OdpsTableInsertExecTransformer(child: SparkPlan, insertIntoOdpsTable: Inse
     }
 
     val outputPartitionColumns =
-      cmd.outputColumns.filter(c => partitionSchema.getFieldIndex(c.name).isDefined)
+      insertIntoOdpsTable.outputColumns.filter(c => partitionSchema.getFieldIndex(c.name).isDefined)
     val outputPartitionSet = AttributeSet(outputPartitionColumns)
-    val dataColumns = cmd.outputColumns.filterNot(outputPartitionSet.contains)
+    val dataColumns = insertIntoOdpsTable.outputColumns.filterNot(outputPartitionSet.contains)
 
     if (partitionSchema.nonEmpty) {
       // val partitionSpec = partition.filter(_._2.nonEmpty).map { case (k, v) => k -> v.get }
@@ -183,6 +181,10 @@ class OdpsTableInsertExecTransformer(child: SparkPlan, insertIntoOdpsTable: Inse
     assert(currRel != null, "Write Rel should be valid")
     print("currRel:" + currRel.toProtobuf.toString)
     TransformContext(childCtx.outputAttributes, output, currRel)
+  }
+
+  override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan = {
+    copy(child = newChild)
   }
 }
 
