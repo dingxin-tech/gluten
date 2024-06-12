@@ -21,11 +21,9 @@ import org.apache.gluten.columnarbatch.ColumnarBatches
 import org.apache.gluten.exception.GlutenException
 import org.apache.gluten.extension.GlutenPlan
 import org.apache.gluten.memory.arrow.alloc.ArrowBufferAllocators
-import org.apache.gluten.sql.shims.SparkShimLoader
 
 import org.apache.spark.{Partition, SparkException, TaskContext, TaskOutputFileAlreadyExistException}
 import org.apache.spark.internal.io.FileCommitProtocol.TaskCommitMessage
-import org.apache.spark.internal.io.SparkHadoopWriterUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.shuffle.FetchFailedException
 import org.apache.spark.sql.catalyst.InternalRow
@@ -41,8 +39,6 @@ import org.apache.spark.util.Utils
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.hadoop.fs.FileAlreadyExistsException
-
-import java.util.Date
 
 import scala.collection.mutable
 
@@ -65,16 +61,14 @@ case class VeloxWriteOdpsMetrics(
  * This RDD is used to make sure we have injected staging write path before initializing the native
  * plan, and support Spark file commit protocol.
  */
-class VeloxColumnarWriteOdpsRDD(
-    var prev: RDD[ColumnarBatch],
-    WriteFilesSpec: WriteFilesSpec,
-    jobTrackerID: String)
-  extends RDD[WriterCommitMessage](prev) {
+class VeloxColumnarWriteOdpsRDD(var prev: RDD[ColumnarBatch]) extends RDD[ColumnarBatch](prev) {
 
   private def collectNativeWriteOdpsMetrics(cb: ColumnarBatch): Option[WriteTaskResult] = {
     // Currently, the cb contains three columns: row, fragments, and context.
     // The first row in the row column contains the number of written numRows.
     // The fragments column contains detailed information about the file writes.
+    print("Collect native write odps metrics.")
+
     val loadedCb = ColumnarBatches.ensureLoaded(ArrowBufferAllocators.contextInstance, cb)
     assert(loadedCb.numCols() == 3)
     val numWrittenRows = loadedCb.column(0).getLong(0)
@@ -95,7 +89,7 @@ class VeloxColumnarWriteOdpsRDD(
       val fileWriteInfo = fileWriteInfos.head
       numBytes += fileWriteInfo.fileSize
       val targetFileName = fileWriteInfo.targetFileName
-      val outputPath = WriteFilesSpec.description.path
+      val outputPath = "outputPath"
 
       // part1=1/part2=1
       val partitionFragment = metrics.name
@@ -103,11 +97,6 @@ class VeloxColumnarWriteOdpsRDD(
       if (partitionFragment != "") {
         updatedPartitions += partitionFragment
         val tmpOutputPath = outputPath + "/" + partitionFragment + "/" + targetFileName
-        val customOutputPath = WriteFilesSpec.description.customPartitionLocations.get(
-          PartitioningUtils.parsePathFragment(partitionFragment))
-        if (customOutputPath.isDefined) {
-          addedAbsPathFiles(tmpOutputPath) = customOutputPath.get + "/" + targetFileName
-        }
       }
     }
 
@@ -149,28 +138,7 @@ class VeloxColumnarWriteOdpsRDD(
     }
   }
 
-  private def WriteOdpsForEmptyIterator(
-      commitProtocol: OdpsMockedCommitProtocol): WriteTaskResult = {
-    val description = WriteFilesSpec.description
-    val committer = WriteFilesSpec.committer
-    val taskAttemptContext = commitProtocol.taskAttemptContext
-
-    val dataWriter =
-      if (commitProtocol.sparkPartitionId != 0) {
-        // In case of empty job, leave first partition to save meta for file format like parquet.
-        new EmptyDirectoryDataWriter(description, taskAttemptContext, committer)
-      } else if (description.partitionColumns.isEmpty) {
-        new SingleDirectoryDataWriter(description, taskAttemptContext, committer)
-      } else {
-        new DynamicPartitionDataSingleWriter(description, taskAttemptContext, committer)
-      }
-
-    // We have done `setupTask` outside
-    dataWriter.writeWithIterator(Iterator.empty)
-    dataWriter.commit()
-  }
-
-  override def compute(split: Partition, context: TaskContext): Iterator[WriterCommitMessage] = {
+  override def compute(split: Partition, context: TaskContext): Iterator[ColumnarBatch] = {
     val commitProtocol = new OdpsMockedCommitProtocol("jobTrackerId")
 
     commitProtocol.setupTask()
@@ -188,15 +156,16 @@ class VeloxColumnarWriteOdpsRDD(
         assert(resultColumnarBatch != null)
         val nativeWriteTaskResult = collectNativeWriteOdpsMetrics(resultColumnarBatch)
         if (nativeWriteTaskResult.isEmpty) {
-          // If we are writing an empty iterator, then velox would do nothing.
-          // Here we fallback to use vanilla Spark write files to generate an empty file for
-          // metadata only.
-          writeTaskResult = WriteOdpsForEmptyIterator(commitProtocol)
+          print(
+            "If we are writing an empty iterator, then velox would do nothing." +
+              "Here we fallback to use vanilla Spark write files to generate an empty file for" +
+              "metadata only.")
           // We have done commit task inside `WriteOdpsForEmptyIterator`.
         } else {
           writeTaskResult = nativeWriteTaskResult.get
           commitProtocol.commitTask()
         }
+        iter
       })(
         catchBlock = {
           // If there is an error, abort the task
@@ -212,13 +181,11 @@ class VeloxColumnarWriteOdpsRDD(
       case t: Throwable =>
         throw new SparkException(
           s"Task failed while writing rows to staging path: $writePath, " +
-            s"output path: ${WriteFilesSpec.description.path}",
+            s"output path: 'WriteFilesSpec.description.path'",
           t)
     }
-
-    assert(writeTaskResult != null)
-    reportTaskMetrics(writeTaskResult)
-    Iterator.single(writeTaskResult)
+//    assert(writeTaskResult != null)
+//    reportTaskMetrics(writeTaskResult)
   }
 
   override protected def getPartitions: Array[Partition] = firstParent[ColumnarBatch].partitions
@@ -252,44 +219,11 @@ case class VeloxColumnarWriteOdpsExec private (
     throw new GlutenException(s"$nodeName does not support doExecute")
   }
 
-  /** Fallback to use vanilla Spark write files to generate an empty file for metadata only. */
-  private def WriteOdpsForEmptyRDD(
-      WriteFilesSpec: WriteFilesSpec,
-      jobTrackerID: String): RDD[WriterCommitMessage] = {
-    val description = WriteFilesSpec.description
-    val committer = WriteFilesSpec.committer
-    val rddWithNonEmptyPartitions = session.sparkContext.parallelize(Seq.empty[InternalRow], 1)
-    rddWithNonEmptyPartitions.mapPartitionsInternal {
-      iterator =>
-        val sparkStageId = TaskContext.get().stageId()
-        val sparkPartitionId = TaskContext.get().partitionId()
-        val sparkAttemptNumber = TaskContext.get().taskAttemptId().toInt & Int.MaxValue
-
-        val ret = SparkShimLoader.getSparkShims.writeFilesExecuteTask(
-          description,
-          jobTrackerID,
-          sparkStageId,
-          sparkPartitionId,
-          sparkAttemptNumber,
-          committer,
-          iterator
-        )
-        Iterator(ret)
-    }
-  }
-
-  override def doExecuteWrite(WriteFilesSpec: WriteFilesSpec): RDD[WriterCommitMessage] = {
+  override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     assert(child.supportsColumnar)
 
     val rdd = child.executeColumnar()
-    val jobTrackerID = SparkHadoopWriterUtils.createJobTrackerID(new Date())
-    if (rdd.partitions.length == 0) {
-      // SPARK-23271 If we are attempting to write a zero partition rdd, create a dummy single
-      // partition rdd to make sure we at least set up one write task to write the metadata.
-      WriteOdpsForEmptyRDD(WriteFilesSpec, jobTrackerID)
-    } else {
-      new VeloxColumnarWriteOdpsRDD(rdd, WriteFilesSpec, jobTrackerID)
-    }
+    new VeloxColumnarWriteOdpsRDD(rdd)
   }
   override protected def withNewChildrenInternal(
       newLeft: SparkPlan,
