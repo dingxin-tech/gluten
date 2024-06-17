@@ -19,10 +19,11 @@ package org.apache.gluten.execution
 import org.apache.gluten.GlutenNumaBindingInfo
 import org.apache.gluten.backendsapi.BackendsApiManager
 import org.apache.gluten.metrics.{GlutenTimeMetric, IMetrics}
+
+import org.apache.spark.{Partition, SparkConf, SparkContext, TaskContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.vectorized.ColumnarBatch
-import org.apache.spark.{Partition, SparkConf, SparkContext, TaskContext}
 
 private[gluten] class ZippedPartitionsPartition(
     override val index: Int,

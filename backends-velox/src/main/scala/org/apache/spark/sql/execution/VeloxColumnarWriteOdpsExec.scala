@@ -19,8 +19,9 @@ package org.apache.spark.sql.execution
 import org.apache.gluten.backendsapi.BackendsApiManager
 import org.apache.gluten.columnarbatch.ColumnarBatches
 import org.apache.gluten.exception.GlutenException
-import org.apache.gluten.extension.GlutenPlan
+import org.apache.gluten.execution.UnaryTransformSupport
 import org.apache.gluten.memory.arrow.alloc.ArrowBufferAllocators
+import org.apache.gluten.metrics.MetricsUpdater
 
 import org.apache.spark.{Partition, SparkException, TaskContext, TaskOutputFileAlreadyExistException}
 import org.apache.spark.internal.io.FileCommitProtocol.TaskCommitMessage
@@ -200,24 +201,12 @@ class VeloxColumnarWriteOdpsRDD(var prev: RDD[ColumnarBatch]) extends RDD[Column
 // we need to expose a dummy child (as right child) with type "WriteOdpsExec" to let Spark
 // choose the new write code path (version >= 3.4). The actual plan to write is the left child
 // of this operator.
-case class VeloxColumnarWriteOdpsExec private (
-    override val left: SparkPlan,
-    override val right: SparkPlan)
-  extends BinaryExecNode
-  with GlutenPlan
-  with VeloxColumnarWriteOdpsExec.ExecuteWriteCompatible {
-
-  val child: SparkPlan = left
+case class VeloxColumnarWriteOdpsExec private (override val child: SparkPlan)
+  extends UnaryTransformSupport {
 
   override lazy val references: AttributeSet = AttributeSet.empty
 
-  override def supportsColumnar(): Boolean = true
-
   override def output: Seq[Attribute] = Seq.empty
-
-  override protected def doExecute(): RDD[InternalRow] = {
-    throw new GlutenException(s"$nodeName does not support doExecute")
-  }
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     assert(child.supportsColumnar)
@@ -228,10 +217,16 @@ case class VeloxColumnarWriteOdpsExec private (
 
     new VeloxColumnarWriteOdpsRDD(rdd)
   }
-  override protected def withNewChildrenInternal(
-      newLeft: SparkPlan,
-      newRight: SparkPlan): SparkPlan =
-    copy(newLeft, newRight)
+
+  @transient override lazy val metrics =
+    BackendsApiManager.getMetricsApiInstance.genWriteFilesTransformerMetrics(sparkContext)
+
+  override def metricsUpdater(): MetricsUpdater =
+    BackendsApiManager.getMetricsApiInstance.genWriteFilesTransformerMetricsUpdater(metrics)
+
+  override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan = {
+    VeloxColumnarWriteOdpsExec(newChild)
+  }
 }
 
 object VeloxColumnarWriteOdpsExec {
@@ -243,25 +238,8 @@ object VeloxColumnarWriteOdpsExec {
       bucketSpec: Option[BucketSpec],
       options: Map[String, String],
       staticPartitions: TablePartitionSpec): VeloxColumnarWriteOdpsExec = {
-    // This is a workaround for FileFormatWriter#write. Vanilla Spark (version >= 3.4) requires for
-    // a plan that has at least one node exactly of type `WriteOdpsExec` that is a Scala
-    // case-class, to decide to choose new `#executeWrite` code path over the legacy `#execute`
-    // for write operation.
-    //
-    // So we add a no-op `WriteOdpsExec` child to let Spark pick the new code path.
-    //
-    // See: FileFormatWriter#write
-    // See: V1Writes#getWriteOdpsOpt
-    val right: SparkPlan =
-      WriteFilesExec(
-        NoopLeaf(),
-        fileFormat,
-        partitionColumns,
-        bucketSpec,
-        options,
-        staticPartitions)
 
-    VeloxColumnarWriteOdpsExec(child, right)
+    VeloxColumnarWriteOdpsExec(child)
   }
 
   private case class NoopLeaf() extends LeafExecNode {
