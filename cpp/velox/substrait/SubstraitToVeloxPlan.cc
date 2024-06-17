@@ -587,6 +587,7 @@ std::shared_ptr<connector::hive::HiveInsertTableHandle> makeHiveInsertTableHandl
 
 core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::WriteRel& writeRel) {
   core::PlanNodePtr childNode;
+  std::cout << "[debug]WriteRel to velox plan: " << writeRel << std::endl;
   if (writeRel.has_input()) {
     childNode = toVeloxPlan(writeRel.input());
   } else {

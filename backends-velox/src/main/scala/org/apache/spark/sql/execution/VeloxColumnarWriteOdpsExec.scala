@@ -143,13 +143,13 @@ class VeloxColumnarWriteOdpsRDD(var prev: RDD[ColumnarBatch]) extends RDD[Column
 
     commitProtocol.setupTask()
     val writePath = commitProtocol.newTaskAttemptTempPath()
-    logDebug(s"Velox staging write path: $writePath")
+    print(s"Velox staging write path: $writePath")
     var writeTaskResult: WriteTaskResult = null
     try {
       Utils.tryWithSafeFinallyAndFailureCallbacks(block = {
         BackendsApiManager.getIteratorApiInstance.injectWriteFilesTempPath(writePath)
 
-        // Initialize the native plan
+        // Initialize the native plan (WholeStageZippedPartitionsRDD)
         val iter = firstParent[ColumnarBatch].iterator(split, context)
         assert(iter.hasNext)
         val resultColumnarBatch = iter.next()
@@ -222,7 +222,10 @@ case class VeloxColumnarWriteOdpsExec private (
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     assert(child.supportsColumnar)
 
+    print("[debug] VeloxColumnarWriteOdpsExec child is :" + child.getClass.getSimpleName + "\n")
     val rdd = child.executeColumnar()
+    print("[debug] child rdd is :" + rdd.getClass.getSimpleName + "\n")
+
     new VeloxColumnarWriteOdpsRDD(rdd)
   }
   override protected def withNewChildrenInternal(

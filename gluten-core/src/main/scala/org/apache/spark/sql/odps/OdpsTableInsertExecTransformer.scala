@@ -167,8 +167,6 @@ case class OdpsTableInsertExecTransformer(
     val inputTypeNodes = output.map {
       attr => ConverterUtils.getTypeNode(attr.dataType, attr.nullable)
     }
-    print("[debug] inputTypeNodes: " + inputTypeNodes)
-
     BackendsApiManager.getTransformerApiInstance.packPBMessage(
       TypeBuilder.makeStruct(false, inputTypeNodes.asJava).toProtobuf)
   }
