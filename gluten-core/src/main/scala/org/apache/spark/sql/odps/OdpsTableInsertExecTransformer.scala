@@ -72,7 +72,7 @@ case class OdpsTableInsertExecTransformer(
       context: SubstraitContext,
       attributes: Seq[Attribute],
       operatorId: lang.Long,
-      root: RelNode,
+      input: RelNode,
       validation: Boolean): RelNode = {
     if (table.tableType == CatalogTableType.EXTERNAL) {
       throw new SparkException(s"Unsupported table type for table write ${table.tableType}")
@@ -143,8 +143,6 @@ case class OdpsTableInsertExecTransformer(
     print(partitionSchema)
     print(partitionColumnNames)
 
-    val childCtx = child.asInstanceOf[TransformSupport].transform(context)
-
     val typeNodes = ConverterUtils.collectAttributeTypeNodes(attributes)
 
     val columnTypeNodes = new java.util.ArrayList[ColumnTypeNode]()
@@ -154,7 +152,7 @@ case class OdpsTableInsertExecTransformer(
     val extensionNode = ExtensionBuilder.makeAdvancedExtension(createEnhancement(attributes))
 
     RelBuilder.makeWriteRel(
-      childCtx.root,
+      input,
       typeNodes,
       nameList,
       columnTypeNodes,
