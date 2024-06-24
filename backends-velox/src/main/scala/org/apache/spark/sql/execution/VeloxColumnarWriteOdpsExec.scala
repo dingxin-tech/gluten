@@ -208,7 +208,7 @@ case class VeloxColumnarWriteOdpsExec private (override val child: SparkPlan)
 
   override def output: Seq[Attribute] = Seq.empty
 
-  override protected def supportsColumnar: Boolean = true;
+  final override lazy val supportsColumnar: Boolean = true
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     assert(child.supportsColumnar)
