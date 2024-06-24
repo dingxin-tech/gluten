@@ -87,6 +87,11 @@ class SubstraitContext extends Serializable {
   def registeredFunction: JHashMap[String, JLong] = functionMap
 
   def nextIteratorIndex: JLong = {
+    val stackTraceElements = Thread.currentThread().getStackTrace
+
+    stackTraceElements.foreach { element =>
+      print("[debug] iterator index " + this.iteratorIndex + " : " + element + "\n")
+    }
     val id = this.iteratorIndex
     this.iteratorIndex += 1
     id
