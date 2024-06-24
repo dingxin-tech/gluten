@@ -19,9 +19,8 @@ package org.apache.spark.sql.execution
 import org.apache.gluten.backendsapi.BackendsApiManager
 import org.apache.gluten.columnarbatch.ColumnarBatches
 import org.apache.gluten.exception.GlutenException
-import org.apache.gluten.execution.UnaryTransformSupport
+import org.apache.gluten.extension.GlutenPlan
 import org.apache.gluten.memory.arrow.alloc.ArrowBufferAllocators
-import org.apache.gluten.metrics.MetricsUpdater
 
 import org.apache.spark.{Partition, SparkException, TaskContext, TaskOutputFileAlreadyExistException}
 import org.apache.spark.internal.io.FileCommitProtocol.TaskCommitMessage
@@ -202,7 +201,8 @@ class VeloxColumnarWriteOdpsRDD(var prev: RDD[ColumnarBatch]) extends RDD[Column
 // choose the new write code path (version >= 3.4). The actual plan to write is the left child
 // of this operator.
 case class VeloxColumnarWriteOdpsExec private (override val child: SparkPlan)
-  extends UnaryTransformSupport {
+  extends UnaryExecNode
+  with GlutenPlan {
 
   override lazy val references: AttributeSet = AttributeSet.empty
 
@@ -221,11 +221,12 @@ case class VeloxColumnarWriteOdpsExec private (override val child: SparkPlan)
   @transient override lazy val metrics =
     BackendsApiManager.getMetricsApiInstance.genWriteFilesTransformerMetrics(sparkContext)
 
-  override def metricsUpdater(): MetricsUpdater =
-    BackendsApiManager.getMetricsApiInstance.genWriteFilesTransformerMetricsUpdater(metrics)
-
   override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan = {
     VeloxColumnarWriteOdpsExec(newChild)
+  }
+
+  override protected def doExecute(): RDD[InternalRow] = {
+    throw new GlutenException(s"$nodeName does not support doExecute")
   }
 }
 
