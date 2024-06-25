@@ -143,10 +143,17 @@ case class OdpsTableInsertExecTransformer(
     print(partitionSchema)
     print(partitionColumnNames)
 
-    val typeNodes = ConverterUtils.collectAttributeTypeNodes(attributes)
-
     val columnTypeNodes = new java.util.ArrayList[ColumnTypeNode]()
     val inputAttributes = new java.util.ArrayList[Attribute]()
+    val childSize = this.child.output.size
+    val childOutput = this.child.output
+    for (i <- 0 until childSize) {
+      columnTypeNodes.add(new ColumnTypeNode(0))
+      inputAttributes.add(attributes(i))
+    }
+
+    val typeNodes = ConverterUtils.collectAttributeTypeNodes(attributes)
+
     val nameList =
       ConverterUtils.collectAttributeNames(inputAttributes.toSeq)
     val extensionNode = ExtensionBuilder.makeAdvancedExtension(createEnhancement(attributes))
@@ -163,7 +170,10 @@ case class OdpsTableInsertExecTransformer(
 
   def createEnhancement(output: Seq[Attribute]): com.google.protobuf.Any = {
     val inputTypeNodes = output.map {
-      attr => ConverterUtils.getTypeNode(attr.dataType, attr.nullable)
+      attr => {
+        print("[debug] enhancement value: " + attr.toJSON)
+        ConverterUtils.getTypeNode(attr.dataType, attr.nullable)
+      }
     }
     BackendsApiManager.getTransformerApiInstance.packPBMessage(
       TypeBuilder.makeStruct(false, inputTypeNodes.asJava).toProtobuf)
