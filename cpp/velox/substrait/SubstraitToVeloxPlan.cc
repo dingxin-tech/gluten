@@ -531,6 +531,32 @@ std::shared_ptr<connector::hive::LocationHandle> makeLocationHandle(
       targetDirectory, writeDirectory.value_or(targetDirectory), tableType);
 }
 
+std::shared_ptr<connector::odps::OdpsInsertTableHandle> makeOdpsInsertTableHandle(const std::string& writePath) {
+  // Split writePath into projectName, schemaName, tableName using dot as delimiter
+  std::vector<std::string> components;
+  std::string token;
+  std::istringstream tokenStream(writePath);
+
+  while (std::getline(tokenStream, token, '.')) {
+    components.push_back(token);
+  }
+
+  // Ensure we have exactly 2/3 components
+  if (components.size() == 3) {
+    std::string projectName = components[0];
+    std::string schemaName = components[1];
+    std::string tableName = components[2];
+  } else if (components.size() == 2) {
+    std::string projectName = components[0];
+    std::string tableName = components[2];
+  } else {
+    throw std::invalid_argument("writePath must be in the format projectName.schemaName.tableName" + writePath);
+  }
+
+  return std::make_shared<connector::odps::OdpsInsertTableHandle>(
+      projectName, schemaName, tableName, "");
+}
+
 std::shared_ptr<connector::hive::HiveInsertTableHandle> makeHiveInsertTableHandle(
     const std::vector<std::string>& tableColumnNames,
     const std::vector<TypePtr>& tableColumnTypes,
@@ -654,14 +680,7 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
       nullptr, /*aggregationNode*/
       std::make_shared<core::InsertTableHandle>(
           kOdpsConnectorId,
-          makeHiveInsertTableHandle(
-              tableColumnNames, /*inputType->names() clolumn name is different*/
-              inputType->children(),
-              partitionedKey,
-              nullptr /*bucketProperty*/,
-              makeLocationHandle(writePath),
-              dwio::common::FileFormat::PARQUET, // Currently only support parquet format.
-              compressionCodec)),
+          makeOdpsInsertTableHandle(writePath)),
       (!partitionedKey.empty()),
       exec::TableWriteTraits::outputType(nullptr),
       connector::CommitStrategy::kNoCommit,

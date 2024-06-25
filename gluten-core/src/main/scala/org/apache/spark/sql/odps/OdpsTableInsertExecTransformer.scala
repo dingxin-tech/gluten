@@ -170,10 +170,11 @@ case class OdpsTableInsertExecTransformer(
 
   def createEnhancement(output: Seq[Attribute]): com.google.protobuf.Any = {
     val inputTypeNodes = output.map {
-      attr => {
-        print("[debug] enhancement value: " + attr.toJSON)
-        ConverterUtils.getTypeNode(attr.dataType, attr.nullable)
-      }
+      attr =>
+        {
+          print("[debug] enhancement value: " + attr.toJSON)
+          ConverterUtils.getTypeNode(attr.dataType, attr.nullable)
+        }
     }
     BackendsApiManager.getTransformerApiInstance.packPBMessage(
       TypeBuilder.makeStruct(false, inputTypeNodes.asJava).toProtobuf)

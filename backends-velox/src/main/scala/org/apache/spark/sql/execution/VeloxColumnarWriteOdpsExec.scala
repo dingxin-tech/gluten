@@ -27,10 +27,8 @@ import org.apache.spark.internal.io.FileCommitProtocol.TaskCommitMessage
 import org.apache.spark.rdd.RDD
 import org.apache.spark.shuffle.FetchFailedException
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.catalog.CatalogTypes.TablePartitionSpec
+import org.apache.spark.sql.catalyst.catalog.CatalogTable
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeSet, GenericInternalRow}
-import org.apache.spark.sql.connector.write.WriterCommitMessage
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.vectorized.ColumnarBatch
@@ -61,7 +59,11 @@ case class VeloxWriteOdpsMetrics(
  * This RDD is used to make sure we have injected staging write path before initializing the native
  * plan, and support Spark file commit protocol.
  */
-class VeloxColumnarWriteOdpsRDD(var prev: RDD[ColumnarBatch]) extends RDD[ColumnarBatch](prev) {
+class VeloxColumnarWriteOdpsRDD(
+    var prev: RDD[ColumnarBatch],
+    table: CatalogTable,
+    partition: Map[String, Option[String]])
+  extends RDD[ColumnarBatch](prev) {
 
   private def collectNativeWriteOdpsMetrics(cb: ColumnarBatch): Option[WriteTaskResult] = {
     // Currently, the cb contains three columns: row, fragments, and context.
@@ -139,7 +141,7 @@ class VeloxColumnarWriteOdpsRDD(var prev: RDD[ColumnarBatch]) extends RDD[Column
   }
 
   override def compute(split: Partition, context: TaskContext): Iterator[ColumnarBatch] = {
-    val commitProtocol = new OdpsMockedCommitProtocol("jobTrackerId")
+    val commitProtocol = new OdpsMockedCommitProtocol(table, partition)
 
     commitProtocol.setupTask()
     val writePath = commitProtocol.newTaskAttemptTempPath()
@@ -200,7 +202,10 @@ class VeloxColumnarWriteOdpsRDD(var prev: RDD[ColumnarBatch]) extends RDD[Column
 // we need to expose a dummy child (as right child) with type "WriteOdpsExec" to let Spark
 // choose the new write code path (version >= 3.4). The actual plan to write is the left child
 // of this operator.
-case class VeloxColumnarWriteOdpsExec private (override val child: SparkPlan)
+case class VeloxColumnarWriteOdpsExec private (
+    override val child: SparkPlan,
+    table: CatalogTable,
+    partition: Map[String, Option[String]])
   extends UnaryExecNode
   with GlutenPlan {
 
@@ -211,20 +216,17 @@ case class VeloxColumnarWriteOdpsExec private (override val child: SparkPlan)
   final override lazy val supportsColumnar: Boolean = true
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
+    // WholeStageTransformer
     assert(child.supportsColumnar)
-
-    print("[debug] VeloxColumnarWriteOdpsExec child is :" + child.getClass.getSimpleName + "\n")
     val rdd = child.executeColumnar()
-    print("[debug] child rdd is :" + rdd.getClass.getSimpleName + "\n")
-
-    new VeloxColumnarWriteOdpsRDD(rdd)
+    new VeloxColumnarWriteOdpsRDD(rdd, table, partition)
   }
 
   @transient override lazy val metrics =
     BackendsApiManager.getMetricsApiInstance.genWriteFilesTransformerMetrics(sparkContext)
 
   override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan = {
-    VeloxColumnarWriteOdpsExec(newChild)
+    VeloxColumnarWriteOdpsExec(newChild, table, partition)
   }
 
   override protected def doExecute(): RDD[InternalRow] = {
@@ -236,27 +238,9 @@ object VeloxColumnarWriteOdpsExec {
 
   def apply(
       child: SparkPlan,
-      fileFormat: FileFormat,
-      partitionColumns: Seq[Attribute],
-      bucketSpec: Option[BucketSpec],
-      options: Map[String, String],
-      staticPartitions: TablePartitionSpec): VeloxColumnarWriteOdpsExec = {
+      table: CatalogTable,
+      partition: Map[String, Option[String]]): VeloxColumnarWriteOdpsExec = {
 
-    VeloxColumnarWriteOdpsExec(child)
-  }
-
-  private case class NoopLeaf() extends LeafExecNode {
-    override protected def doExecute(): RDD[InternalRow] =
-      throw new GlutenException(s"$nodeName does not support doExecute")
-    override def output: Seq[Attribute] = Seq.empty
-  }
-
-  sealed trait ExecuteWriteCompatible {
-    // To be compatible with Spark (version < 3.4)
-    protected def doExecuteWrite(WriteFilesSpec: WriteFilesSpec): RDD[WriterCommitMessage] = {
-      throw new GlutenException(
-        s"Internal Error ${this.getClass} has write support" +
-          s" mismatch:\n${this}")
-    }
+    VeloxColumnarWriteOdpsExec(child, table, partition)
   }
 }

@@ -16,37 +16,12 @@
  */
 package org.apache.spark.sql.execution
 
-import org.apache.spark.TaskContext
-import org.apache.spark.internal.io.SparkHadoopWriterUtils
-import org.apache.spark.internal.io.SparkHadoopWriterUtils.createJobID
+import org.apache.spark.sql.catalyst.catalog.CatalogTable
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.mapreduce.{TaskAttemptContext, TaskAttemptID, TaskID, TaskType}
-import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
-
-import java.util.Date
-
-/** @author dingxin (zhangdingxin.zdx@alibaba-inc.com) */
-class OdpsMockedCommitProtocol(jobTrackerID: String) {
-
-  val sparkStageId = TaskContext.get().stageId()
-  val sparkPartitionId = TaskContext.get().partitionId()
-  val sparkAttemptNumber = TaskContext.get().taskAttemptId().toInt & Int.MaxValue
-
-  val jobTrackerID2 = SparkHadoopWriterUtils.createJobTrackerID(new Date())
-  private val jobId = createJobID(new Date(), sparkStageId)
-
-  private val taskId = new TaskID(jobId, TaskType.MAP, sparkPartitionId)
-
-  val taskAttemptId = new TaskAttemptID(taskId, 1)
-
-  val taskAttemptContext: TaskAttemptContext = {
-    new TaskAttemptContextImpl(new Configuration(), taskAttemptId)
-  }
+class OdpsMockedCommitProtocol(table: CatalogTable, partition: Map[String, Option[String]]) {
 
   def newTaskAttemptTempPath(): String = {
-    print("newTaskAttemptTempPath")
-    "path"
+    table.identifier.toString()
   }
 
   def setupTask(): Unit = {
@@ -60,6 +35,5 @@ class OdpsMockedCommitProtocol(jobTrackerID: String) {
   def abortTask(): Unit = {
     print("abortTask")
   }
-  def getJobId: String = jobId.toString
-
+  def getJobId: String = table.identifier.toString()
 }
