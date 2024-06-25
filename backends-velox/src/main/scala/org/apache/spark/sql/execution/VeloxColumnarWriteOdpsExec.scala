@@ -38,6 +38,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.hadoop.fs.FileAlreadyExistsException
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 case class VeloxWriteOdpsInfo(writeFileName: String, targetFileName: String, fileSize: Long)
@@ -241,6 +242,6 @@ object VeloxColumnarWriteOdpsExec {
       table: CatalogTable,
       partition: Map[String, Option[String]]): VeloxColumnarWriteOdpsExec = {
 
-    VeloxColumnarWriteOdpsExec(child, table, partition)
+    new VeloxColumnarWriteOdpsExec(child, table, partition)
   }
 }

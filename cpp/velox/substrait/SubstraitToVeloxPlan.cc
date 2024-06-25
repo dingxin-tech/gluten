@@ -546,15 +546,18 @@ std::shared_ptr<connector::odps::OdpsInsertTableHandle> makeOdpsInsertTableHandl
     std::string projectName = components[0];
     std::string schemaName = components[1];
     std::string tableName = components[2];
+
+    return std::make_shared<connector::odps::OdpsInsertTableHandle>(
+        projectName, schemaName, tableName, "");
   } else if (components.size() == 2) {
     std::string projectName = components[0];
     std::string tableName = components[2];
+
+    return std::make_shared<connector::odps::OdpsInsertTableHandle>(
+        projectName, tableName, "");
   } else {
     throw std::invalid_argument("writePath must be in the format projectName.schemaName.tableName" + writePath);
   }
-
-  return std::make_shared<connector::odps::OdpsInsertTableHandle>(
-      projectName, schemaName, tableName, "");
 }
 
 std::shared_ptr<connector::hive::HiveInsertTableHandle> makeHiveInsertTableHandle(
