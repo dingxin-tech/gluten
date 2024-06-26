@@ -23,23 +23,17 @@ import org.apache.gluten.extension.GlutenPlan
 import org.apache.gluten.memory.arrow.alloc.ArrowBufferAllocators
 
 import org.apache.spark.{Partition, SparkException, TaskContext, TaskOutputFileAlreadyExistException}
-import org.apache.spark.internal.io.FileCommitProtocol.TaskCommitMessage
 import org.apache.spark.rdd.RDD
 import org.apache.spark.shuffle.FetchFailedException
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.catalog.CatalogTable
-import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeSet, GenericInternalRow}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeSet}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.Utils
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.hadoop.fs.FileAlreadyExistsException
-
-import scala.annotation.tailrec
-import scala.collection.mutable
 
 case class VeloxWriteOdpsInfo(writeFileName: String, targetFileName: String, fileSize: Long)
 
@@ -73,60 +67,9 @@ class VeloxColumnarWriteOdpsRDD(
     print("Collect native write odps metrics.")
 
     val loadedCb = ColumnarBatches.ensureLoaded(ArrowBufferAllocators.contextInstance, cb)
-    assert(loadedCb.numCols() == 3)
-    val numWrittenRows = loadedCb.column(0).getLong(0)
 
-    var updatedPartitions = Set.empty[String]
-    val addedAbsPathFiles: mutable.Map[String, String] = mutable.Map[String, String]()
-    var numBytes = 0L
-    val objectMapper = new ObjectMapper()
-    objectMapper.registerModule(DefaultScalaModule)
-    for (i <- 0 until loadedCb.numRows() - 1) {
-      val fragments = loadedCb.column(1).getUTF8String(i + 1)
-      val metrics = objectMapper
-        .readValue(fragments.toString.getBytes("UTF-8"), classOf[VeloxWriteOdpsMetrics])
-      logDebug(s"Velox write files metrics: $metrics")
-
-      val fileWriteInfos = metrics.fileWriteInfos
-      assert(fileWriteInfos.length == 1)
-      val fileWriteInfo = fileWriteInfos.head
-      numBytes += fileWriteInfo.fileSize
-      val targetFileName = fileWriteInfo.targetFileName
-      val outputPath = "outputPath"
-
-      // part1=1/part2=1
-      val partitionFragment = metrics.name
-      // Write a partitioned table
-      if (partitionFragment != "") {
-        updatedPartitions += partitionFragment
-        val tmpOutputPath = outputPath + "/" + partitionFragment + "/" + targetFileName
-      }
-    }
-
-    val numFiles = loadedCb.numRows() - 1
-    val partitionsInternalRows = updatedPartitions.map {
-      part =>
-        val parts = new Array[Any](1)
-        parts(0) = part
-        new GenericInternalRow(parts)
-    }.toSeq
-    val stats = BasicWriteTaskStats(
-      partitions = partitionsInternalRows,
-      numFiles = numFiles,
-      numBytes = numBytes,
-      numRows = numWrittenRows)
-    val summary =
-      ExecutedWriteSummary(updatedPartitions = updatedPartitions, stats = Seq(stats))
-
-    // Write an empty iterator
-    if (numFiles == 0) {
-      None
-    } else {
-      Some(
-        WriteTaskResult(
-          new TaskCommitMessage(addedAbsPathFiles.toMap -> updatedPartitions),
-          summary))
-    }
+    print("loadedCb: " + loadedCb.numRows() + " " + loadedCb.numCols())
+    None
   }
 
   private def reportTaskMetrics(writeTaskResult: WriteTaskResult): Unit = {

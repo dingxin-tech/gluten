@@ -531,7 +531,16 @@ std::shared_ptr<connector::hive::LocationHandle> makeLocationHandle(
       targetDirectory, writeDirectory.value_or(targetDirectory), tableType);
 }
 
+std::string removeExternalBrackets(const std::string& str) {
+  if (!str.empty() && str[0] == '`' && str.back() == '`') {
+    return str.substr(1, str.length() - 2);
+  }
+  return str;
+}
+
 std::shared_ptr<connector::odps::OdpsInsertTableHandle> makeOdpsInsertTableHandle(const std::string& writePath) {
+
+  std::cout << "[debug] write data to " << writePath << std::endl;
   // Split writePath into projectName, schemaName, tableName using dot as delimiter
   std::vector<std::string> components;
   std::string token;
@@ -543,16 +552,15 @@ std::shared_ptr<connector::odps::OdpsInsertTableHandle> makeOdpsInsertTableHandl
 
   // Ensure we have exactly 2/3 components
   if (components.size() == 3) {
-    std::string projectName = components[0];
-    std::string schemaName = components[1];
-    std::string tableName = components[2];
+    std::string projectName = removeExternalBrackets(components[0]);
+    std::string schemaName = removeExternalBrackets(components[1]);
+    std::string tableName = removeExternalBrackets(components[2]);
 
     return std::make_shared<connector::odps::OdpsInsertTableHandle>(
         projectName, schemaName, tableName, "");
   } else if (components.size() == 2) {
-    std::string projectName = components[0];
-    std::string tableName = components[2];
-
+    std::string projectName = removeExternalBrackets(components[0]);
+    std::string tableName = removeExternalBrackets(components[1]);
     return std::make_shared<connector::odps::OdpsInsertTableHandle>(
         projectName, tableName, "");
   } else {
