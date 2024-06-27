@@ -176,7 +176,8 @@ object OdpsTableInsertExecTransformer {
             )
           case _ =>
             throw new UnsupportedOperationException(
-              s"Can't transform HiveTableScanExecTransformer from ${dataWritingCommandExec.cmd.getClass.getSimpleName}")
+              s"Can't transform HiveTableScanExecTransformer from " +
+                s"${dataWritingCommandExec.cmd.getClass.getSimpleName}")
         }
       case _ =>
         throw new UnsupportedOperationException(
