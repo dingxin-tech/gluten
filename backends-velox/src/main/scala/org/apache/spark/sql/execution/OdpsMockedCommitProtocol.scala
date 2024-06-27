@@ -16,11 +16,43 @@
  */
 package org.apache.spark.sql.execution
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.catalog.CatalogTable
+import org.apache.spark.sql.odps.OdpsClient
 
-class OdpsMockedCommitProtocol(table: CatalogTable, partition: Map[String, Option[String]]) {
+import com.aliyun.odps.table.TableIdentifier
+import com.aliyun.odps.table.configuration.ArrowOptions
+import com.aliyun.odps.table.configuration.ArrowOptions.TimestampUnit
+import com.aliyun.odps.table.write.{TableWriteCapabilities, TableWriteSessionBuilder}
+
+class OdpsMockedCommitProtocol(table: CatalogTable, partition: Map[String, Option[String]])
+  extends Logging {
 
   def newTaskAttemptTempPath(): String = {
+    val settings = OdpsClient.get.getEnvironmentSettings
+    // TODO: val provider = OdpsOptions.odpsTableReaderProvider(conf)
+
+    val arrowOptions = ArrowOptions
+      .newBuilder()
+      .withDatetimeUnit(TimestampUnit.MILLI)
+      .withTimestampUnit(TimestampUnit.MICRO)
+      .build()
+
+    val writeCapabilities = TableWriteCapabilities
+      .newBuilder()
+      .supportDynamicPartition(true)
+      .supportHashBuckets(true)
+      .supportRangeBuckets(true)
+      .build()
+
+    val sinkBuilder = new TableWriteSessionBuilder()
+      .identifier(TableIdentifier.of(table.identifier.database.get, table.identifier.table))
+      .withArrowOptions(arrowOptions)
+      .withCapabilities(writeCapabilities)
+      .withSettings(settings)
+
+    val batchSink = sinkBuilder.buildBatchWriteSession()
+    logInfo(s"Create table sink ${batchSink.getId} for ${batchSink.getTableIdentifier}")
     table.identifier.toString()
   }
 
