@@ -37,7 +37,6 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.Utils
 
-import org.apache.curator.framework.recipes.queue.ErrorMode
 import org.apache.hadoop.fs.FileAlreadyExistsException
 
 import scala.util.control.NonFatal
@@ -144,7 +143,7 @@ class VeloxColumnarWriteOdpsRDD(
     }
   }
 
-  private def createTableFirst(sparkSession: SparkSession, tableDesc: CatalogTable): Void = {
+  private def createTableFirst(sparkSession: SparkSession, tableDesc: CatalogTable): Unit = {
     val catalog = sparkSession.sessionState.catalog
     val tableIdentifier = tableDesc.identifier
     val tableExists = catalog.tableExists(tableIdentifier)
@@ -176,7 +175,6 @@ class VeloxColumnarWriteOdpsRDD(
           catalog.dropTable(tableIdentifier, ignoreIfNotExists = true, purge = false)
           throw e
       }
-      Void
     }
   }
 
