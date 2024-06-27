@@ -537,7 +537,9 @@ class VeloxSparkPlanExecApi extends SparkPlanExecApi {
       VeloxColumnarWriteOdpsExec(
         child,
         child.asInstanceOf[OdpsTableInsertExecTransformer].table,
-        child.asInstanceOf[OdpsTableInsertExecTransformer].partition
+        child.asInstanceOf[OdpsTableInsertExecTransformer].partition,
+        child.asInstanceOf[OdpsTableInsertExecTransformer].columns,
+        child.asInstanceOf[OdpsTableInsertExecTransformer].createTable
       )
     } else {
       VeloxColumnarWriteFilesExec(

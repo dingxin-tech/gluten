@@ -25,15 +25,22 @@ import org.apache.gluten.memory.arrow.alloc.ArrowBufferAllocators
 import org.apache.spark.{Partition, SparkException, TaskContext, TaskOutputFileAlreadyExistException}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.shuffle.FetchFailedException
+import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.catalog.CatalogTable
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeSet}
+import org.apache.spark.sql.catalyst.util.CharVarcharUtils
+import org.apache.spark.sql.errors.QueryCompilationErrors
+import org.apache.spark.sql.execution.command.DataWritingCommand
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.Utils
 
+import org.apache.curator.framework.recipes.queue.ErrorMode
 import org.apache.hadoop.fs.FileAlreadyExistsException
+
+import scala.util.control.NonFatal
 
 case class VeloxWriteOdpsInfo(writeFileName: String, targetFileName: String, fileSize: Long)
 
@@ -56,8 +63,10 @@ case class VeloxWriteOdpsMetrics(
  */
 class VeloxColumnarWriteOdpsRDD(
     var prev: RDD[ColumnarBatch],
-    table: CatalogTable,
-    partition: Map[String, Option[String]])
+    var table: CatalogTable,
+    partition: Map[String, Option[String]],
+    outputColumns: Seq[Attribute],
+    createTable: Boolean)
   extends RDD[ColumnarBatch](prev) {
 
   private def collectNativeWriteOdpsMetrics(cb: ColumnarBatch): Option[WriteTaskResult] = {
@@ -85,6 +94,9 @@ class VeloxColumnarWriteOdpsRDD(
   }
 
   override def compute(split: Partition, context: TaskContext): Iterator[ColumnarBatch] = {
+    if (createTable) {
+      createTableFirst(SparkSession.active, table)
+    }
     val commitProtocol = new OdpsMockedCommitProtocol(table, partition)
 
     commitProtocol.setupTask()
@@ -130,8 +142,42 @@ class VeloxColumnarWriteOdpsRDD(
             s"output path: 'WriteFilesSpec.description.path'",
           t)
     }
-//    assert(writeTaskResult != null)
-//    reportTaskMetrics(writeTaskResult)
+  }
+
+  private def createTableFirst(sparkSession: SparkSession, tableDesc: CatalogTable): Void = {
+    val catalog = sparkSession.sessionState.catalog
+    val tableIdentifier = tableDesc.identifier
+    val tableExists = catalog.tableExists(tableIdentifier)
+
+    if (tableExists) {
+      throw QueryCompilationErrors.tableIdentifierExistsError(tableIdentifier)
+    } else {
+      tableDesc.storage.locationUri.foreach {
+        p =>
+          DataWritingCommand.assertEmptyRootPath(
+            p,
+            SaveMode.ErrorIfExists,
+            sparkSession.sessionState.newHadoopConf)
+      }
+      // TODO ideally, we should get the output data ready first and then
+      // add the relation into catalog, just in case of failure occurs while data
+      // processing.
+      val tableSchema =
+        CharVarcharUtils.getRawSchema(outputColumns.toStructType, sparkSession.sessionState.conf)
+      assert(tableDesc.schema.isEmpty)
+      catalog.createTable(tableDesc.copy(schema = tableSchema), ignoreIfExists = false)
+
+      try {
+        // Read back the metadata of the table which was created just now.
+        table = catalog.getTableMetadata(tableDesc.identifier)
+      } catch {
+        case NonFatal(e) =>
+          // drop the created table.
+          catalog.dropTable(tableIdentifier, ignoreIfNotExists = true, purge = false)
+          throw e
+      }
+      Void
+    }
   }
 
   override protected def getPartitions: Array[Partition] = firstParent[ColumnarBatch].partitions
@@ -149,7 +195,9 @@ class VeloxColumnarWriteOdpsRDD(
 case class VeloxColumnarWriteOdpsExec private (
     override val child: SparkPlan,
     table: CatalogTable,
-    partition: Map[String, Option[String]])
+    partition: Map[String, Option[String]],
+    outputColumns: Seq[Attribute],
+    createTable: Boolean)
   extends UnaryExecNode
   with GlutenPlan {
 
@@ -161,16 +209,17 @@ case class VeloxColumnarWriteOdpsExec private (
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     // WholeStageTransformer
+
     assert(child.supportsColumnar)
     val rdd = child.executeColumnar()
-    new VeloxColumnarWriteOdpsRDD(rdd, table, partition)
+    new VeloxColumnarWriteOdpsRDD(rdd, table, partition, outputColumns, createTable)
   }
 
   @transient override lazy val metrics =
     BackendsApiManager.getMetricsApiInstance.genWriteFilesTransformerMetrics(sparkContext)
 
   override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan = {
-    VeloxColumnarWriteOdpsExec(newChild, table, partition)
+    VeloxColumnarWriteOdpsExec(newChild, table, partition, outputColumns, createTable)
   }
 
   override protected def doExecute(): RDD[InternalRow] = {
@@ -183,8 +232,10 @@ object VeloxColumnarWriteOdpsExec {
   def apply(
       child: SparkPlan,
       table: CatalogTable,
-      partition: Map[String, Option[String]]): VeloxColumnarWriteOdpsExec = {
+      partition: Map[String, Option[String]],
+      outputColumns: Seq[Attribute],
+      createTable: Boolean): VeloxColumnarWriteOdpsExec = {
 
-    new VeloxColumnarWriteOdpsExec(child, table, partition)
+    new VeloxColumnarWriteOdpsExec(child, table, partition, outputColumns, createTable)
   }
 }

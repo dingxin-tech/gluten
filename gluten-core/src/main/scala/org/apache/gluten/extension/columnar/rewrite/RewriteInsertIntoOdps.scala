@@ -15,49 +15,74 @@
  * limitations under the License.
  */
 package org.apache.gluten.extension.columnar.rewrite
+
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.{Ascending, BindReferences, SortOrder}
 import org.apache.spark.sql.execution.{SortExec, SparkPlan}
 import org.apache.spark.sql.execution.command.DataWritingCommandExec
-import org.apache.spark.sql.hive.execution.InsertIntoOdpsTable
+import org.apache.spark.sql.hive.execution.{CreateOdpsTableAsSelectCommand, InsertIntoOdpsTable}
 
 object RewriteInsertIntoOdps extends RewriteSingleNode with Logging {
+
   override def rewrite(plan: SparkPlan): SparkPlan = {
     plan.transformDown {
-      case insertPlan: DataWritingCommandExec =>
-        val insertIntoOdpsTable = insertPlan.cmd.asInstanceOf[InsertIntoOdpsTable]
-
-        val partitionSchema = insertIntoOdpsTable.table.partitionSchema
-        val outputPartitionColumns =
-          insertIntoOdpsTable.outputColumns.filter(c => partitionSchema.fieldNames.contains(c.name))
-        val dynamicPartitionColumns = outputPartitionColumns
-
-        val outputColumns = insertPlan.output
-
-        // We should first sort by partition columns, then bucket id, and finally sorting columns.
-        val requiredOrdering = dynamicPartitionColumns
-        // the sort order doesn't matter
-        val actualOrdering = plan.outputOrdering.map(_.child)
-        logInfo(s"requiredOrdering: $requiredOrdering, actualOrdering: $actualOrdering")
-
-        val orderingMatched = if (requiredOrdering.length > actualOrdering.length) {
-          false
-        } else {
-          requiredOrdering.zip(actualOrdering).forall {
-            case (requiredOrder, childOutputOrder) =>
-              requiredOrder.semanticEquals(childOutputOrder)
-          }
-        }
-
-        if (orderingMatched) {
-          plan
-        } else {
-          val orderingExpr = requiredOrdering
-            .map(SortOrder(_, Ascending))
-            .map(BindReferences.bindReference(_, outputColumns))
-          SortExec(orderingExpr, global = false, child = plan)
-        }
+      case insertPlan: DataWritingCommandExec => handleDataWritingCommandExec(insertPlan)
       case _ => plan
+    }
+  }
+
+  private def handleDataWritingCommandExec(insertPlan: DataWritingCommandExec): SparkPlan = {
+    insertPlan.cmd match {
+      case insertIntoOdpsTable: InsertIntoOdpsTable =>
+        handleInsertIntoOdps(insertIntoOdpsTable, insertPlan)
+      case createTableAsSelect: CreateOdpsTableAsSelectCommand =>
+        val insertIntoOdpsTable = getInsertIntoOdpsTableFromCreateTable(createTableAsSelect)
+        handleInsertIntoOdps(insertIntoOdpsTable, insertPlan)
+      case _ => insertPlan
+    }
+  }
+
+  private def getInsertIntoOdpsTableFromCreateTable(
+      createTableAsSelect: CreateOdpsTableAsSelectCommand): InsertIntoOdpsTable = {
+    val sparkSession: SparkSession = SparkSession.active
+    val catalog = sparkSession.sessionState.catalog
+    createTableAsSelect
+      .getWritingCommand(catalog, createTableAsSelect.tableDesc, false)
+      .asInstanceOf[InsertIntoOdpsTable]
+  }
+
+  private def handleInsertIntoOdps(
+      insertIntoOdpsTable: InsertIntoOdpsTable,
+      insertPlan: DataWritingCommandExec): SparkPlan = {
+
+    val partitionSchema = insertIntoOdpsTable.table.partitionSchema
+    val outputPartitionColumns =
+      insertIntoOdpsTable.outputColumns.filter(c => partitionSchema.fieldNames.contains(c.name))
+    val dynamicPartitionColumns = outputPartitionColumns
+    val outputColumns = insertPlan.output
+
+    // We should first sort by partition columns, then bucket id, and finally sorting columns.
+    val partitionOrderingColumns = dynamicPartitionColumns
+    val actualOrdering = insertPlan.outputOrdering.map(_.child)
+
+    // Logging required and actual ordering
+    logInfo(s"requiredOrdering: $partitionOrderingColumns, actualOrdering: $actualOrdering")
+
+    // Check if ordering matches
+    val orderingMatched = partitionOrderingColumns.length <= actualOrdering.length &&
+      partitionOrderingColumns.zip(actualOrdering).forall {
+        case (requiredOrder, childOutputOrder) => requiredOrder.semanticEquals(childOutputOrder)
+      }
+
+    // If ordering matches, return original plan, otherwise add a SortExec
+    if (orderingMatched) {
+      insertPlan
+    } else {
+      val orderingExpr = partitionOrderingColumns
+        .map(SortOrder(_, Ascending))
+        .map(BindReferences.bindReference(_, outputColumns))
+      SortExec(orderingExpr, global = false, child = insertPlan)
     }
   }
 }
