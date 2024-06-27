@@ -93,9 +93,6 @@ class VeloxColumnarWriteOdpsRDD(
   }
 
   override def compute(split: Partition, context: TaskContext): Iterator[ColumnarBatch] = {
-    if (createTable) {
-      createTableFirst(SparkSession.active, table)
-    }
     val commitProtocol = new OdpsMockedCommitProtocol(table, partition)
 
     commitProtocol.setupTask()
@@ -143,6 +140,42 @@ class VeloxColumnarWriteOdpsRDD(
     }
   }
 
+  override protected def getPartitions: Array[Partition] = firstParent[ColumnarBatch].partitions
+
+  override def clearDependencies(): Unit = {
+    super.clearDependencies()
+    prev = null
+  }
+}
+
+// The class inherits from "BinaryExecNode" instead of "UnaryExecNode" because
+// we need to expose a dummy child (as right child) with type "WriteOdpsExec" to let Spark
+// choose the new write code path (version >= 3.4). The actual plan to write is the left child
+// of this operator.
+case class VeloxColumnarWriteOdpsExec private (
+    override val child: SparkPlan,
+    var table: CatalogTable,
+    partition: Map[String, Option[String]],
+    outputColumns: Seq[Attribute],
+    createTable: Boolean)
+  extends UnaryExecNode
+  with GlutenPlan {
+
+  override lazy val references: AttributeSet = AttributeSet.empty
+
+  override def output: Seq[Attribute] = Seq.empty
+
+  final override lazy val supportsColumnar: Boolean = true
+
+  override def doExecuteColumnar(): RDD[ColumnarBatch] = {
+    if (createTable) {
+      createTableFirst(SparkSession.active, table)
+    }
+    assert(child.supportsColumnar)
+    val rdd = child.executeColumnar()
+    new VeloxColumnarWriteOdpsRDD(rdd, table, partition, outputColumns, createTable)
+  }
+
   private def createTableFirst(sparkSession: SparkSession, tableDesc: CatalogTable): Unit = {
     val catalog = sparkSession.sessionState.catalog
     val tableIdentifier = tableDesc.identifier
@@ -162,7 +195,7 @@ class VeloxColumnarWriteOdpsRDD(
       // add the relation into catalog, just in case of failure occurs while data
       // processing.
       val tableSchema =
-        CharVarcharUtils.getRawSchema(outputColumns.toStructType, sparkSession.sessionState.conf)
+      CharVarcharUtils.getRawSchema(outputColumns.toStructType, sparkSession.sessionState.conf)
       assert(tableDesc.schema.isEmpty)
       catalog.createTable(tableDesc.copy(schema = tableSchema), ignoreIfExists = false)
 
@@ -176,41 +209,6 @@ class VeloxColumnarWriteOdpsRDD(
           throw e
       }
     }
-  }
-
-  override protected def getPartitions: Array[Partition] = firstParent[ColumnarBatch].partitions
-
-  override def clearDependencies(): Unit = {
-    super.clearDependencies()
-    prev = null
-  }
-}
-
-// The class inherits from "BinaryExecNode" instead of "UnaryExecNode" because
-// we need to expose a dummy child (as right child) with type "WriteOdpsExec" to let Spark
-// choose the new write code path (version >= 3.4). The actual plan to write is the left child
-// of this operator.
-case class VeloxColumnarWriteOdpsExec private (
-    override val child: SparkPlan,
-    table: CatalogTable,
-    partition: Map[String, Option[String]],
-    outputColumns: Seq[Attribute],
-    createTable: Boolean)
-  extends UnaryExecNode
-  with GlutenPlan {
-
-  override lazy val references: AttributeSet = AttributeSet.empty
-
-  override def output: Seq[Attribute] = Seq.empty
-
-  final override lazy val supportsColumnar: Boolean = true
-
-  override def doExecuteColumnar(): RDD[ColumnarBatch] = {
-    // WholeStageTransformer
-
-    assert(child.supportsColumnar)
-    val rdd = child.executeColumnar()
-    new VeloxColumnarWriteOdpsRDD(rdd, table, partition, outputColumns, createTable)
   }
 
   @transient override lazy val metrics =

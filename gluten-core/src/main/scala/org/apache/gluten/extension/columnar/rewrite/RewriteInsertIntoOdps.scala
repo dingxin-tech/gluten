@@ -26,6 +26,7 @@ import org.apache.spark.sql.hive.execution.{CreateOdpsTableAsSelectCommand, Inse
 object RewriteInsertIntoOdps extends RewriteSingleNode with Logging {
 
   override def rewrite(plan: SparkPlan): SparkPlan = {
+    print("RewriteInsertIntoOdps\n")
     plan.transformDown {
       case insertPlan: DataWritingCommandExec => handleDataWritingCommandExec(insertPlan)
       case _ => plan
