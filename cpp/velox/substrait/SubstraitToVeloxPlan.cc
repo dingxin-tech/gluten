@@ -659,6 +659,24 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
     writePath = "";
   }
 
+  // Parse the OdpsInsertHandle if it exists
+  if (writeRel.has_odps_insert_handle()) {
+    const auto& odpsInsertHandle = writeRel.odps_insert_handle();
+    std::string project = odpsInsertHandle.project();
+    std::string schema = odpsInsertHandle.schema();
+    std::string table = odpsInsertHandle.table();
+    std::string session = odpsInsertHandle.session();
+
+    // Print the OdpsInsertHandle values for debugging purposes
+    std::cout << "[debug] OdpsInsertHandle - Project: " << project << std::endl;
+    std::cout << "[debug] OdpsInsertHandle - Schema: " << schema << std::endl;
+    std::cout << "[debug] OdpsInsertHandle - Table: " << table << std::endl;
+    std::cout << "[debug] OdpsInsertHandle - Session: " << session << std::endl;
+
+    // Optionally, you can use these values to set corresponding fields or configure the plan
+    // ...
+  }
+
   // spark default compression code is snappy.
   common::CompressionKind compressionCodec = common::CompressionKind::CompressionKind_SNAPPY;
   if (writeRel.named_table().has_advanced_extension()) {

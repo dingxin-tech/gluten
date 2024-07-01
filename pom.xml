@@ -49,7 +49,7 @@
     <scala.version>2.12.15</scala.version>
     <spark.major.version>3</spark.major.version>
     <sparkbundle.version>3.4</sparkbundle.version>
-    <spark.version>3.4.2</spark.version>
+    <spark.version>3.3.1</spark.version>
     <sparkshim.module.name>spark33</sparkshim.module.name>
     <sparkshim.artifactId>spark-sql-columnar-shims-spark33</sparkshim.artifactId>
     <iceberg.version>1.5.0</iceberg.version>

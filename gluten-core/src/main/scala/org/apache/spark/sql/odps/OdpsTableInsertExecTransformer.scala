@@ -24,7 +24,7 @@ import org.apache.gluten.metrics.MetricsUpdater
 import org.apache.gluten.substrait.`type`.{ColumnTypeNode, TypeBuilder}
 import org.apache.gluten.substrait.SubstraitContext
 import org.apache.gluten.substrait.extensions.ExtensionBuilder
-import org.apache.gluten.substrait.rel.{RelBuilder, RelNode}
+import org.apache.gluten.substrait.rel.{OdpsInsertHandle, RelBuilder, RelNode, WriteRelNode}
 
 import org.apache.spark.SparkException
 import org.apache.spark.sql.SparkSession
@@ -34,6 +34,11 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.command.DataWritingCommandExec
 import org.apache.spark.sql.hive.execution.{CreateOdpsTableAsSelectCommand, InsertIntoOdpsTable}
+
+import com.aliyun.odps.table.TableIdentifier
+import com.aliyun.odps.table.configuration.ArrowOptions
+import com.aliyun.odps.table.configuration.ArrowOptions.TimestampUnit
+import com.aliyun.odps.table.write.{TableWriteCapabilities, TableWriteSessionBuilder}
 
 import java.lang
 
@@ -90,7 +95,7 @@ case class OdpsTableInsertExecTransformer(
       ConverterUtils.collectAttributeNames(inputAttributes.toSeq)
     val extensionNode = ExtensionBuilder.makeAdvancedExtension(createEnhancement(attributes))
 
-    RelBuilder.makeWriteRel(
+    val node = RelBuilder.makeWriteRel(
       input,
       typeNodes,
       nameList,
@@ -98,6 +103,41 @@ case class OdpsTableInsertExecTransformer(
       extensionNode,
       context,
       operatorId)
+
+    val settings = OdpsClient.get.getEnvironmentSettings
+    // TODO: val provider = OdpsOptions.odpsTableReaderProvider(conf)
+
+    val arrowOptions = ArrowOptions
+      .newBuilder()
+      .withDatetimeUnit(TimestampUnit.MILLI)
+      .withTimestampUnit(TimestampUnit.MICRO)
+      .build()
+
+    val writeCapabilities = TableWriteCapabilities
+      .newBuilder()
+      .supportDynamicPartition(true)
+      .supportHashBuckets(true)
+      .supportRangeBuckets(true)
+      .build()
+
+    val sinkBuilder = new TableWriteSessionBuilder()
+      .identifier(TableIdentifier.of(table.identifier.database.get, table.identifier.table))
+      .withArrowOptions(arrowOptions)
+      .withCapabilities(writeCapabilities)
+      .withSettings(settings)
+
+    val batchSink = sinkBuilder.buildBatchWriteSession()
+    logInfo(s"Create table sink ${batchSink.getId} for ${batchSink.getTableIdentifier}")
+
+    node
+      .asInstanceOf[WriteRelNode]
+      .setOdpsInsertHandle(
+        new OdpsInsertHandle(
+          table.identifier.database.get,
+          "default",
+          table.identifier.table,
+          batchSink.getId))
+    node
   }
 
   def createEnhancement(output: Seq[Attribute]): com.google.protobuf.Any = {

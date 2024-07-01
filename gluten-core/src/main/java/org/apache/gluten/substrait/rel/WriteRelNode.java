@@ -39,6 +39,8 @@ public class WriteRelNode implements RelNode, Serializable {
 
   private final AdvancedExtensionNode extensionNode;
 
+  private OdpsInsertHandle odpsInsertHandle;
+
   WriteRelNode(
       RelNode input,
       List<TypeNode> types,
@@ -50,6 +52,10 @@ public class WriteRelNode implements RelNode, Serializable {
     this.names.addAll(names);
     this.columnTypeNodes.addAll(partitionColumnTypeNodes);
     this.extensionNode = extensionNode;
+  }
+
+  public void setOdpsInsertHandle(OdpsInsertHandle odpsInsertHandle) {
+    this.odpsInsertHandle = odpsInsertHandle;
   }
 
   @Override
@@ -85,6 +91,16 @@ public class WriteRelNode implements RelNode, Serializable {
 
     if (input != null) {
       writeBuilder.setInput(input.toProtobuf());
+    }
+
+    if (odpsInsertHandle != null) {
+      WriteRel.OdpsInsertHandle.Builder odpsBuilder =
+          WriteRel.OdpsInsertHandle.newBuilder()
+              .setProject(odpsInsertHandle.project)
+              .setSchema(odpsInsertHandle.schema)
+              .setTable(odpsInsertHandle.table)
+              .setSession(odpsInsertHandle.sessionId);
+      writeBuilder.setOdpsInsertHandle(odpsBuilder);
     }
 
     Rel.Builder builder = Rel.newBuilder();

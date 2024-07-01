@@ -65,7 +65,7 @@ class VeloxColumnarWriteOdpsRDD(
     var table: CatalogTable,
     partition: Map[String, Option[String]],
     outputColumns: Seq[Attribute],
-    createTable: Boolean)
+    sessionId: String)
   extends RDD[ColumnarBatch](prev) {
 
   private def collectNativeWriteOdpsMetrics(cb: ColumnarBatch): Option[WriteTaskResult] = {
@@ -92,11 +92,12 @@ class VeloxColumnarWriteOdpsRDD(
     }
   }
 
-  override def compute(split: Partition, context: TaskContext): Iterator[ColumnarBatch] = {
-    val commitProtocol = new OdpsMockedCommitProtocol(table, partition)
+  def computeWritePath(table: CatalogTable, sessionId: String): String = {
+    ""
+  }
 
-    commitProtocol.setupTask()
-    val writePath = commitProtocol.newTaskAttemptTempPath()
+  override def compute(split: Partition, context: TaskContext): Iterator[ColumnarBatch] = {
+    val writePath = computeWritePath(table, sessionId)
     print(s"Velox staging write path: $writePath")
     var writeTaskResult: WriteTaskResult = null
     try {
@@ -117,14 +118,12 @@ class VeloxColumnarWriteOdpsRDD(
           // We have done commit task inside `WriteOdpsForEmptyIterator`.
         } else {
           writeTaskResult = nativeWriteTaskResult.get
-          commitProtocol.commitTask()
         }
         iter
       })(
         catchBlock = {
           // If there is an error, abort the task
-          commitProtocol.abortTask()
-          logError(s"Job ${commitProtocol.getJobId} aborted.")
+          logError(s"Job aborted.")
         }
       )
     } catch {
@@ -173,7 +172,7 @@ case class VeloxColumnarWriteOdpsExec private (
     }
     assert(child.supportsColumnar)
     val rdd = child.executeColumnar()
-    new VeloxColumnarWriteOdpsRDD(rdd, table, partition, outputColumns, createTable)
+    new VeloxColumnarWriteOdpsRDD(rdd, table, partition, outputColumns, batchSink.getId)
   }
 
   private def createTableFirst(sparkSession: SparkSession, tableDesc: CatalogTable): Unit = {
@@ -195,7 +194,7 @@ case class VeloxColumnarWriteOdpsExec private (
       // add the relation into catalog, just in case of failure occurs while data
       // processing.
       val tableSchema =
-      CharVarcharUtils.getRawSchema(outputColumns.toStructType, sparkSession.sessionState.conf)
+        CharVarcharUtils.getRawSchema(outputColumns.toStructType, sparkSession.sessionState.conf)
       assert(tableDesc.schema.isEmpty)
       catalog.createTable(tableDesc.copy(schema = tableSchema), ignoreIfExists = false)
 
