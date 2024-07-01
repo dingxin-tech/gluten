@@ -22,7 +22,7 @@ import org.apache.gluten.exception.GlutenException
 import org.apache.gluten.extension.GlutenPlan
 import org.apache.gluten.memory.arrow.alloc.ArrowBufferAllocators
 
-import org.apache.spark.{Partition, SparkException, TaskContext, TaskOutputFileAlreadyExistException}
+import org.apache.spark.{Partition, TaskContext, TaskOutputFileAlreadyExistException}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.shuffle.FetchFailedException
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -90,7 +90,6 @@ class VeloxColumnarWriteOdpsRDD(
         outputMetrics.setRecordsWritten(numWrittenRows)
     }
   }
-
 
   override def compute(split: Partition, context: TaskContext): Iterator[ColumnarBatch] = {
     var writeTaskResult: WriteTaskResult = null
