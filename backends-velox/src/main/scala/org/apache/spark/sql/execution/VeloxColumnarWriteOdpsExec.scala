@@ -16,13 +16,13 @@
  */
 package org.apache.spark.sql.execution
 
-import org.apache.arrow.vector.FieldVector
 import org.apache.gluten.backendsapi.BackendsApiManager
 import org.apache.gluten.columnarbatch.ColumnarBatches
 import org.apache.gluten.exception.GlutenException
 import org.apache.gluten.extension.GlutenPlan
 import org.apache.gluten.memory.arrow.alloc.ArrowBufferAllocators
 import org.apache.gluten.vectorized.ArrowWritableColumnVector
+
 import org.apache.spark.{Partition, TaskContext, TaskOutputFileAlreadyExistException}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.shuffle.FetchFailedException
@@ -38,6 +38,7 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.Utils
 
+import org.apache.arrow.vector.FieldVector
 import org.apache.hadoop.fs.FileAlreadyExistsException
 
 import scala.util.control.NonFatal
@@ -68,7 +69,7 @@ class VeloxColumnarWriteOdpsRDD(
     outputColumns: Seq[Attribute])
   extends RDD[ColumnarBatch](prev) {
 
-  private def collectNativeWriteOdpsMetrics(cb: ColumnarBatch): Option[WriteTaskResult] = {
+  private def collectNativeWriteOdpsMetrics(cb: ColumnarBatch): Option[ColumnarBatch] = {
     // Currently, the cb contains three columns: row, fragments, and context.
     // The first row in the row column contains the number of written numRows.
     // The fragments column contains detailed information about the file writes.
@@ -76,23 +77,30 @@ class VeloxColumnarWriteOdpsRDD(
 
     val loadedCb = ColumnarBatches.ensureLoaded(ArrowBufferAllocators.contextInstance, cb)
 
-
+    /**
+     * Column 0: name = rows Row 0, Column 0 value = 2 Row 1, Column 0 value = null
+     *
+     * Column 1: name = fragments Row 0, Column 1 value = null Row 1, Column 1 value = [B@24ba19e1
+     *
+     * Column 2: name = commitcontext Row 0, Column 2 value = [B@7981570b Row 1, Column 2 value =
+     * [B@27ee7b5dIf
+     */
     // Traverse each column and print its content
     for (colIdx <- 0 until loadedCb.numCols()) {
       val col = loadedCb.column(colIdx).asInstanceOf[ArrowWritableColumnVector]
       col.getValueVector match {
         case vector: FieldVector =>
           // Print column type and name
-          print(s"Column $colIdx: name = ${vector.getField().getName()}")
+          print(s"Column $colIdx: name = ${vector.getField().getName()} \n")
 
           // Print each value in the column
           for (rowIdx <- 0 until loadedCb.numRows()) {
-            print(s"Row $rowIdx, Column $colIdx value = ${vector.getObject(rowIdx)}")
+            print(s"Row $rowIdx, Column $colIdx value = ${vector.getObject(rowIdx).toString} \n")
           }
         case _ => print(s"Column $colIdx is not a FieldVector")
       }
     }
-    None
+    Option.apply(loadedCb)
   }
 
   private def reportTaskMetrics(writeTaskResult: WriteTaskResult): Unit = {
@@ -108,7 +116,7 @@ class VeloxColumnarWriteOdpsRDD(
   }
 
   override def compute(split: Partition, context: TaskContext): Iterator[ColumnarBatch] = {
-    var writeTaskResult: WriteTaskResult = null
+    var writeTaskResult: ColumnarBatch = null
     try {
       Utils.tryWithSafeFinallyAndFailureCallbacks(block = {
         // BackendsApiManager.getIteratorApiInstance.injectWriteFilesTempPath("writePath")
@@ -127,6 +135,7 @@ class VeloxColumnarWriteOdpsRDD(
           // We have done commit task inside `WriteOdpsForEmptyIterator`.
         } else {
           writeTaskResult = nativeWriteTaskResult.get
+          Iterator.single(writeTaskResult)
         }
         iter
       })(
@@ -186,7 +195,7 @@ case class VeloxColumnarWriteOdpsExec private (
   }
 
   def commit(batches: Array[ColumnarBatch]): Unit = {
-    print(batches.length)
+    print("\ntrigger commit" + batches.length)
   }
 
   private def createTableFirst(sparkSession: SparkSession, tableDesc: CatalogTable): Unit = {
