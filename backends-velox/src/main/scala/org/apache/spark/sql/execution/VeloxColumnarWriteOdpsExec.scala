@@ -64,8 +64,7 @@ class VeloxColumnarWriteOdpsRDD(
     var prev: RDD[ColumnarBatch],
     var table: CatalogTable,
     partition: Map[String, Option[String]],
-    outputColumns: Seq[Attribute],
-    sessionId: String)
+    outputColumns: Seq[Attribute])
   extends RDD[ColumnarBatch](prev) {
 
   private def collectNativeWriteOdpsMetrics(cb: ColumnarBatch): Option[WriteTaskResult] = {
@@ -92,17 +91,12 @@ class VeloxColumnarWriteOdpsRDD(
     }
   }
 
-  def computeWritePath(table: CatalogTable, sessionId: String): String = {
-    ""
-  }
 
   override def compute(split: Partition, context: TaskContext): Iterator[ColumnarBatch] = {
-    val writePath = computeWritePath(table, sessionId)
-    print(s"Velox staging write path: $writePath")
     var writeTaskResult: WriteTaskResult = null
     try {
       Utils.tryWithSafeFinallyAndFailureCallbacks(block = {
-        BackendsApiManager.getIteratorApiInstance.injectWriteFilesTempPath(writePath)
+        // BackendsApiManager.getIteratorApiInstance.injectWriteFilesTempPath("writePath")
 
         // Initialize the native plan (WholeStageZippedPartitionsRDD)
         val iter = firstParent[ColumnarBatch].iterator(split, context)
@@ -131,11 +125,6 @@ class VeloxColumnarWriteOdpsRDD(
         throw e
       case f: FileAlreadyExistsException if SQLConf.get.fastFailFileFormatOutput =>
         throw new TaskOutputFileAlreadyExistException(f)
-      case t: Throwable =>
-        throw new SparkException(
-          s"Task failed while writing rows to staging path: $writePath, " +
-            s"output path: 'WriteFilesSpec.description.path'",
-          t)
     }
   }
 
@@ -172,7 +161,7 @@ case class VeloxColumnarWriteOdpsExec private (
     }
     assert(child.supportsColumnar)
     val rdd = child.executeColumnar()
-    new VeloxColumnarWriteOdpsRDD(rdd, table, partition, outputColumns, batchSink.getId)
+    new VeloxColumnarWriteOdpsRDD(rdd, table, partition, outputColumns)
   }
 
   private def createTableFirst(sparkSession: SparkSession, tableDesc: CatalogTable): Unit = {
