@@ -176,7 +176,17 @@ case class VeloxColumnarWriteOdpsExec private (
     }
     assert(child.supportsColumnar)
     val rdd = child.executeColumnar()
-    new VeloxColumnarWriteOdpsRDD(rdd, table, partition, outputColumns)
+    val veloxRdd = new VeloxColumnarWriteOdpsRDD(rdd, table, partition, outputColumns)
+    // Collect the results and commit
+    val collectedBatch = veloxRdd.collect()
+    commit(collectedBatch)
+
+    // Return the original RDD
+    veloxRdd
+  }
+
+  def commit(batches: Array[ColumnarBatch]): Unit = {
+    print(batches.length)
   }
 
   private def createTableFirst(sparkSession: SparkSession, tableDesc: CatalogTable): Unit = {
