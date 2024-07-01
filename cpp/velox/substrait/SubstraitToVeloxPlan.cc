@@ -621,14 +621,6 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
     }
   }
 
-  std::string writePath;
-  if (writeFilesTempPath_.has_value()) {
-    writePath = writeFilesTempPath_.value();
-  } else {
-    VELOX_CHECK(validationMode_, "WriteRel should have the write path before initializing the plan.");
-    writePath = "";
-  }
-
   std::shared_ptr<connector::odps::OdpsInsertTableHandle> tableHandle = nullptr;
   // Parse the OdpsInsertHandle if it exists
   if (writeRel.has_odps_insert_handle()) {

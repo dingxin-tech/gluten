@@ -16,12 +16,13 @@
  */
 package org.apache.spark.sql.execution
 
+import org.apache.arrow.vector.FieldVector
 import org.apache.gluten.backendsapi.BackendsApiManager
 import org.apache.gluten.columnarbatch.ColumnarBatches
 import org.apache.gluten.exception.GlutenException
 import org.apache.gluten.extension.GlutenPlan
 import org.apache.gluten.memory.arrow.alloc.ArrowBufferAllocators
-
+import org.apache.gluten.vectorized.ArrowWritableColumnVector
 import org.apache.spark.{Partition, TaskContext, TaskOutputFileAlreadyExistException}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.shuffle.FetchFailedException
@@ -75,7 +76,22 @@ class VeloxColumnarWriteOdpsRDD(
 
     val loadedCb = ColumnarBatches.ensureLoaded(ArrowBufferAllocators.contextInstance, cb)
 
-    print("loadedCb: " + loadedCb.numRows() + " " + loadedCb.numCols())
+
+    // Traverse each column and print its content
+    for (colIdx <- 0 until loadedCb.numCols()) {
+      val col = loadedCb.column(colIdx).asInstanceOf[ArrowWritableColumnVector]
+      col.getValueVector match {
+        case vector: FieldVector =>
+          // Print column type and name
+          print(s"Column $colIdx: name = ${vector.getField().getName()}")
+
+          // Print each value in the column
+          for (rowIdx <- 0 until loadedCb.numRows()) {
+            print(s"Row $rowIdx, Column $colIdx value = ${vector.getObject(rowIdx)}")
+          }
+        case _ => print(s"Column $colIdx is not a FieldVector")
+      }
+    }
     None
   }
 
