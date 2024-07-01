@@ -659,6 +659,7 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
     writePath = "";
   }
 
+  std::shared_ptr<connector::odps::OdpsInsertTableHandle> tableHandle = nullptr;
   // Parse the OdpsInsertHandle if it exists
   if (writeRel.has_odps_insert_handle()) {
     const auto& odpsInsertHandle = writeRel.odps_insert_handle();
@@ -666,6 +667,8 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
     std::string schema = odpsInsertHandle.schema();
     std::string table = odpsInsertHandle.table();
     std::string session = odpsInsertHandle.session();
+
+    ;
 
     // Print the OdpsInsertHandle values for debugging purposes
     std::cout << "[debug] OdpsInsertHandle - Project: " << project << std::endl;
@@ -675,6 +678,7 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
 
     // Optionally, you can use these values to set corresponding fields or configure the plan
     // ...
+    tableHandle = std::make_shared<connector::odps::OdpsInsertTableHandle>(project, schema, table, session);
   }
 
   // spark default compression code is snappy.
@@ -709,7 +713,7 @@ core::PlanNodePtr SubstraitToVeloxPlanConverter::toVeloxPlan(const ::substrait::
       nullptr, /*aggregationNode*/
       std::make_shared<core::InsertTableHandle>(
           kOdpsConnectorId,
-          makeOdpsInsertTableHandle(writePath)),
+          tableHandle),
       (!partitionedKey.empty()),
       exec::TableWriteTraits::outputType(nullptr),
       connector::CommitStrategy::kNoCommit,
