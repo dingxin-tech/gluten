@@ -95,7 +95,12 @@ class VeloxColumnarWriteOdpsRDD(
 
           // Print each value in the column
           for (rowIdx <- 0 until loadedCb.numRows()) {
-            print(s"Row $rowIdx, Column $colIdx value = ${vector.getObject(rowIdx).toString} \n")
+            val value = vector.getObject(rowIdx)
+            var valueString = "NULL"
+            if (value != null) {
+              valueString = value.toString
+            }
+            print(s"Row $rowIdx, Column $colIdx value = ${valueString} \n")
           }
         case _ => print(s"Column $colIdx is not a FieldVector")
       }
