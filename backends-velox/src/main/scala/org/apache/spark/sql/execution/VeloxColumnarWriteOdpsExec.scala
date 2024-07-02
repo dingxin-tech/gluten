@@ -133,10 +133,8 @@ class VeloxColumnarWriteOdpsRDD(
 
         val nativeWriteTaskResult = collectNativeWriteOdpsMetrics(resultColumnarBatch)
         if (nativeWriteTaskResult.isEmpty) {
-          println(
-            "If we are writing an empty iterator, then velox would do nothing." +
-              "Here we fallback to use vanilla Spark write files to generate an empty file for" +
-              "metadata only.")
+          print(
+            "If we are writing an empty iterator, then velox would do nothing.")
           // We have done commit task inside `WriteOdpsForEmptyIterator`.
           Iterator.empty
         } else {
@@ -150,6 +148,7 @@ class VeloxColumnarWriteOdpsRDD(
           Iterator.empty
         }
       )
+      Iterator.empty
     } catch {
       case e: FetchFailedException =>
         throw e
