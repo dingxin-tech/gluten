@@ -16,8 +16,10 @@
  */
 package org.apache.gluten.substrait.rel;
 
+import java.io.Serializable;
+
 /** @author dingxin (zhangdingxin.zdx@alibaba-inc.com) */
-public class OdpsInsertHandle {
+public class OdpsInsertHandle implements Serializable {
   String project;
   String schema;
   String table;
