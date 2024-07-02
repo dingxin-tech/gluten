@@ -96,9 +96,9 @@ class VeloxColumnarWriteOdpsRDD(
           // Print each value in the column
           for (rowIdx <- 0 until loadedCb.numRows()) {
             val value = vector.getObject(rowIdx)
-            var valueString = "NULL"
+            var valueString = vector.getClass.getName
             if (value != null) {
-              valueString = value.toString
+              valueString = valueString + " : " + value.getClass.getName
             }
             print(s"Row $rowIdx, Column $colIdx value = ${valueString} \n")
           }
@@ -121,32 +121,33 @@ class VeloxColumnarWriteOdpsRDD(
   }
 
   override def compute(split: Partition, context: TaskContext): Iterator[ColumnarBatch] = {
-    var writeTaskResult: ColumnarBatch = null
     try {
       Utils.tryWithSafeFinallyAndFailureCallbacks(block = {
         // BackendsApiManager.getIteratorApiInstance.injectWriteFilesTempPath("writePath")
-
         // Initialize the native plan (WholeStageZippedPartitionsRDD)
         val iter = firstParent[ColumnarBatch].iterator(split, context)
         assert(iter.hasNext)
+
         val resultColumnarBatch = iter.next()
         assert(resultColumnarBatch != null)
+
         val nativeWriteTaskResult = collectNativeWriteOdpsMetrics(resultColumnarBatch)
         if (nativeWriteTaskResult.isEmpty) {
-          print(
+          println(
             "If we are writing an empty iterator, then velox would do nothing." +
               "Here we fallback to use vanilla Spark write files to generate an empty file for" +
               "metadata only.")
           // We have done commit task inside `WriteOdpsForEmptyIterator`.
+          Iterator.empty
         } else {
-          writeTaskResult = nativeWriteTaskResult.get
+          val writeTaskResult = nativeWriteTaskResult.get
           Iterator.single(writeTaskResult)
         }
-        iter
       })(
         catchBlock = {
           // If there is an error, abort the task
           logError(s"Job aborted.")
+          Iterator.empty
         }
       )
     } catch {
@@ -154,6 +155,9 @@ class VeloxColumnarWriteOdpsRDD(
         throw e
       case f: FileAlreadyExistsException if SQLConf.get.fastFailFileFormatOutput =>
         throw new TaskOutputFileAlreadyExistException(f)
+      case e: Exception =>
+        logError("Exception in compute method", e)
+        Iterator.empty
     }
   }
 
